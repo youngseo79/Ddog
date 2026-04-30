@@ -1,0 +1,1560 @@
+/* =============================================
+   똑비서 - CSS (다크모드)
+   ============================================= */
+
+:root {
+  --bg-base:      #16181d;
+  --bg-surface:   #1e2028;
+  --bg-elevated:  #262932;
+  --bg-hover:     #2e3240;
+  --accent:       #7ecfa0;
+  --accent-dim:   #4a9e6d;
+  --accent-glow:  rgba(126, 207, 160, 0.15);
+  --text-primary:   #e8eaf0;
+  --text-secondary: #8b90a0;
+  --text-muted:     #555a6a;
+  --text-done:      #4a4f5e;
+  --border:       #2a2d38;
+  --border-light: #333748;
+  --danger:       #e05c6a;
+  --imp-1: #9e9e9e;
+  --imp-2: #c8a84b;
+  --imp-3: #e8732a;
+  --bottom-nav-h: 60px;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --font-main: 'Noto Sans KR', sans-serif;
+  --font-ui:   'DM Sans', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: var(--font-main);
+  background: var(--bg-base);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+button { border: none; cursor: pointer; background: none; color: inherit; font-family: inherit; }
+input, textarea { font-family: inherit; }
+ul { list-style: none; }
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  max-width: 480px;
+  margin: 0 auto;
+  position: relative;
+  overflow: hidden;
+}
+
+.tab-content { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+.tab-content.active { display: flex; }
+
+/* ── 달력 ── */
+#calendar-section {
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 12px 4px;
+  flex-shrink: 0;
+  user-select: none;
+  transition: all 0.35s cubic-bezier(0.4,0,0.2,1);
+  overflow: hidden;
+}
+#calendar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+#cal-title { font-family: var(--font-ui); font-size: 15px; font-weight: 500; color: var(--text-primary); display: flex; gap: 4px; align-items: center; }
+.cal-year-btn, .cal-month-btn { color: var(--accent); cursor: pointer; padding: 2px 6px; border-radius: var(--radius-sm); transition: background 0.15s; font-weight: 700; font-size: 18px; }
+.cal-year-btn:hover, .cal-month-btn:hover { background: var(--accent-glow); }
+.cal-nav { font-size: 22px; color: var(--text-secondary); width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: background 0.15s, color 0.15s; }
+.cal-nav:hover { background: var(--bg-elevated); color: var(--accent); }
+.cal-thismonth-btn {
+  font-size: 11px; font-weight: 500;
+  color: var(--text-secondary);
+  padding: 4px 9px;
+  border-radius: 12px;
+  border: 1px solid var(--border-light);
+  margin-left: 4px;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+.cal-thismonth-btn:hover { background: var(--accent-glow); color: var(--accent); border-color: var(--accent); }
+#calendar-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); margin-bottom: 1px; }
+.wd { text-align: center; font-size: 10px; color: var(--text-muted); padding: 1px 0; font-family: var(--font-ui); }
+.wd.sun { color: #e05c6a; }
+.wd.sat { color: #6b9fd4; }
+#calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0; }
+.cal-day {
+  aspect-ratio: 1.4;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; border-radius: 6px; cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  position: relative; color: var(--text-primary);
+  overflow: visible;
+}
+.cal-day:hover { background: var(--bg-hover); }
+.cal-day.other-month { color: var(--text-muted); }
+.cal-day.sun { color: #e05c6a; }
+.cal-day.sat { color: #6b9fd4; }
+.cal-day.today { background: transparent; color: var(--accent); font-weight: 700; }
+.cal-day.selected { background: transparent; font-weight: 700; }
+.cal-day.today::before, .cal-day.selected::before {
+  content: '';
+  position: absolute;
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 0;
+}
+.cal-day.today::before { background: var(--accent-glow); border: 1.5px solid var(--accent); }
+.cal-day.selected::before { background: var(--accent); }
+.cal-day.selected { color: #1a1a2e; position: relative; }
+.cal-day span { position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; }
+/* 점은 span 아래 절대 위치로 고정 — 숫자 위치에 영향 없음 */
+.cal-day.has-todo span::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  margin-top: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: block;
+  flex-shrink: 0;
+}
+.cal-day.selected.has-todo span::after { background: #1a1a2e; }
+.cal-day.today.has-todo span::after { background: var(--accent); }
+.cal-day.past-undone span::after { background: #e05c6a; }
+.cal-day.selected.past-undone span::after { background: #1a1a2e; }
+
+/* ── 날짜 바 ── */
+#selected-date-bar { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; background: var(--bg-base); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+#selected-date-label { font-size: 14px; font-weight: 700; font-family: var(--font-ui); }
+#selected-date-label.date-label-weekday { color: var(--text-primary); }
+#selected-date-label.date-label-sat { color: #6b9fd4; }
+#selected-date-label.date-label-sun { color: var(--danger); }
+
+#date-bar-actions {
+  display: flex; align-items: center; gap: 4px;
+  visibility: hidden;
+}
+
+/* ── 할일 목록 ── */
+#todo-list-section { flex: 1; overflow-y: auto; padding: 8px 0 calc(var(--bottom-nav-h) + 20px); -webkit-overflow-scrolling: touch; }
+#todo-list-section::-webkit-scrollbar { width: 3px; }
+#todo-list-section::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 2px; }
+
+.todo-item {
+  display: flex; align-items: center; padding: 7px 16px;
+  border-bottom: 1px solid var(--border); position: relative;
+  overflow: hidden; touch-action: pan-y; background: var(--bg-base); gap: 12px;
+}
+.todo-item:hover { background: var(--bg-surface); }
+.todo-item.dragging { opacity: 0.6; background: var(--bg-elevated); z-index: 100; }
+.todo-item.drag-over-top    { border-top: 2.5px solid var(--accent); }
+.todo-item.drag-over-bottom { border-bottom: 2.5px solid var(--accent); }
+
+.todo-check { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--border-light); flex-shrink: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: border-color 0.2s, background 0.2s; }
+.todo-check:hover { border-color: var(--accent); }
+.todo-check.checked { border-color: var(--accent-dim); background: var(--accent-dim); }
+.todo-check.checked::after { content: '✓'; font-size: 12px; color: #fff; font-weight: 700; }
+
+.todo-text { flex: 1; min-width: 0; }
+.todo-title { font-size: 14px; font-weight: 400; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.4; }
+.todo-meta { display: flex; gap: 6px; margin-top: 3px; align-items: center; }
+.todo-memo { font-size: 11px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.imp-badge { width: 4px; align-self: stretch; min-height: 28px; border-radius: 2px; flex-shrink: 0; }
+.imp-0 { background: transparent; }
+.imp-1 { background: var(--imp-1); }
+.imp-2 { background: var(--imp-2); }
+.imp-3 { background: var(--imp-3); }
+
+/* 반복 일정 배지: 빨간 세로선 + 샛노란 별 */
+.imp-repeat {
+  width: 4px;
+  align-self: stretch;
+  min-height: 28px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  background: #e05c6a;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+}
+.repeat-star {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 9px;
+  line-height: 1;
+  color: #FFE000;
+  text-shadow: 0 0 3px rgba(255,224,0,0.6);
+  pointer-events: none;
+}
+
+.todo-item.done { opacity: 0.5; }
+.todo-item.done .todo-title { text-decoration: line-through; color: var(--text-done); }
+
+.done-divider { display: flex; align-items: center; gap: 10px; padding: 10px 16px; color: var(--text-muted); font-size: 11px; font-family: var(--font-ui); }
+.done-divider::before, .done-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+.drag-handle { color: var(--text-muted); cursor: grab; flex-shrink: 0; padding: 4px 6px; touch-action: none; display: flex; align-items: center; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+
+/* ── 점3개 메뉴 버튼 ── */
+.todo-menu-btn { color: var(--text-muted); cursor: pointer; flex-shrink: 0; padding: 4px 8px; display: flex; align-items: center; opacity: 0.4; transition: opacity 0.15s; }
+.todo-menu-btn:hover { opacity: 1; }
+.todo-item:hover .todo-menu-btn,
+.week-todo-item:hover .todo-menu-btn { opacity: 0.7; }
+
+.empty-state { text-align: center; padding: 48px 24px; color: var(--text-muted); font-size: 14px; }
+.empty-state .empty-icon { font-size: 40px; margin-bottom: 12px; opacity: 0.4; display: block; }
+
+/* ── 하단 탭바 ── */
+#bottom-nav {
+  height: var(--bottom-nav-h);
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border);
+  display: flex; align-items: center;
+  flex-shrink: 0; z-index: 10;
+}
+.nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: var(--text-muted); font-size: 10px; font-family: var(--font-ui); transition: color 0.15s; height: 100%; }
+.nav-btn svg { width: 22px; height: 22px; }
+.nav-btn.active { color: var(--accent); }
+
+/* ── FAB ── */
+#fab-add {
+  width: 44px; height: 44px; border-radius: 50%;
+  background: var(--accent); color: #1a1a2e;
+  font-size: 26px; font-weight: 300;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 16px rgba(126,207,160,0.4);
+  flex-shrink: 0; margin-right: 12px;
+  transition: transform 0.15s, box-shadow 0.15s; line-height: 1;
+}
+#fab-add:hover { transform: scale(1.08); }
+#fab-add:active { transform: scale(0.95); }
+
+/* ── 모달 ── */
+#modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100; display: flex; align-items: flex-end; backdrop-filter: blur(4px); }
+#modal-overlay.hidden { display: none; }
+#modal-box { background: var(--bg-elevated); width: 100%; max-width: 480px; margin: 0 auto; border-radius: var(--radius) var(--radius) 0 0; padding: 20px 20px 32px; animation: slideUp 0.25s ease; }
+@keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+#modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+#modal-title-label { font-size: 15px; font-weight: 500; color: var(--text-secondary); }
+#modal-close { color: var(--text-muted); font-size: 18px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: background 0.15s; }
+#modal-close:hover { background: var(--bg-hover); color: var(--text-primary); }
+#modal-title-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+#input-title { flex: 1; background: var(--bg-surface); border: 1px solid var(--border-light); border-radius: var(--radius-sm); padding: 10px 14px; color: var(--text-primary); font-size: 15px; outline: none; transition: border-color 0.15s; }
+#input-title:focus { border-color: var(--accent); }
+#input-title::placeholder { color: var(--text-muted); }
+#detail-toggle-label { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11px; color: var(--text-secondary); cursor: pointer; flex-shrink: 0; white-space: nowrap; }
+#detail-toggle { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+#detail-section { border-top: 1px solid var(--border); padding-top: 14px; display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
+#detail-section.hidden { display: none; }
+.detail-row { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
+.detail-label { font-size: 12px; color: var(--text-secondary); min-width: 32px; flex-shrink: 0; }
+.detail-unit { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+#importance-btns { display: flex; gap: 4px; flex-shrink: 0; }
+.imp-btn { padding: 5px 9px; border-radius: 20px; font-size: 12px; border: 1px solid var(--border-light); color: var(--text-secondary); transition: all 0.15s; white-space: nowrap; }
+.imp-btn:hover { border-color: var(--accent); color: var(--accent); }
+.imp-btn.active { background: var(--accent); color: #1a1a2e; border-color: var(--accent); font-weight: 600; }
+.imp-btn[data-val="1"].active { background: var(--imp-1); border-color: var(--imp-1); color: #1a1a2e; }
+.imp-btn[data-val="2"].active { background: var(--imp-2); border-color: var(--imp-2); color: #fff; }
+.imp-btn[data-val="3"].active { background: var(--imp-3); border-color: var(--imp-3); color: #fff; }
+#input-memo { flex: 1; background: var(--bg-surface); border: 1px solid var(--border-light); border-radius: var(--radius-sm); padding: 8px 12px; color: var(--text-primary); font-size: 13px; outline: none; resize: none; height: 60px; transition: border-color 0.15s; }
+#input-memo:focus { border-color: var(--accent); }
+#input-memo::placeholder { color: var(--text-muted); }
+#input-date, #input-remind { flex: 1; background: var(--bg-surface); border: 1px solid var(--border-light); border-radius: var(--radius-sm); padding: 8px 12px; color: var(--text-primary); font-size: 13px; outline: none; transition: border-color 0.15s; }
+#input-remind { max-width: 70px; flex: none; }
+#input-date:focus, #input-remind:focus { border-color: var(--accent); }
+#input-date::-webkit-calendar-picker-indicator { filter: invert(0.7); }
+#modal-save { width: 100%; padding: 13px; background: var(--accent); color: #1a1a2e; border-radius: var(--radius-sm); font-size: 15px; font-weight: 600; transition: opacity 0.15s, transform 0.1s; margin-top: 4px; }
+#modal-save:hover { opacity: 0.9; }
+#modal-save:active { transform: scale(0.98); }
+
+/* ── 액션 팝업 ── */
+#action-popup { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 90; display: flex; align-items: flex-end; backdrop-filter: blur(3px); }
+#action-popup.hidden { display: none; }
+#action-box { background: var(--bg-elevated); width: 100%; max-width: 480px; margin: 0 auto; border-radius: var(--radius) var(--radius) 0 0; padding: 12px 16px 20px; display: flex; flex-direction: column; gap: 4px; animation: slideUp 0.2s ease; position: relative; overflow: hidden; }
+.action-btn { padding: 15px 20px; border-radius: var(--radius-sm); font-size: 15px; text-align: left; color: var(--text-primary); transition: background 0.15s; }
+.action-btn:hover { background: var(--bg-hover); }
+.action-btn.danger { color: var(--danger); }
+
+/* 날짜 피커: 모바일/PC 모두 화면 표시 없이 피커만 열기 위한 숨김 처리 */
+#action-date-picker {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  border: none;
+  padding: 0;
+  pointer-events: none;
+}
+
+/* ── 년도/월 팝업 ── */
+#year-popup, #month-popup { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 110; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+#year-popup.hidden, #month-popup.hidden { display: none; }
+#year-box, #month-box { background: var(--bg-elevated); border-radius: var(--radius); padding: 24px; width: 260px; border: 1px solid var(--border-light); }
+#year-box label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 12px; }
+#year-input { width: 100%; background: var(--bg-surface); border: 1px solid var(--border-light); border-radius: var(--radius-sm); padding: 10px 14px; color: var(--text-primary); font-size: 18px; font-family: var(--font-ui); text-align: center; outline: none; margin-bottom: 16px; }
+#year-input:focus { border-color: var(--accent); }
+#year-btns { display: flex; gap: 8px; }
+#year-cancel, #year-confirm { flex: 1; padding: 10px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 500; }
+#year-cancel { background: var(--bg-hover); color: var(--text-secondary); }
+#year-confirm { background: var(--accent); color: #1a1a2e; }
+#month-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.month-btn { padding: 12px 8px; border-radius: var(--radius-sm); font-size: 14px; color: var(--text-primary); border: 1px solid var(--border); transition: all 0.15s; text-align: center; }
+.month-btn:hover { background: var(--accent-glow); border-color: var(--accent); color: var(--accent); }
+.month-btn.current { background: var(--accent); color: #1a1a2e; border-color: var(--accent); font-weight: 600; }
+
+/* ── 검색 탭 ── */
+#tab-search { flex-direction: column; background: var(--bg-base); }
+#search-container { display: flex; flex-direction: column; flex: 1; overflow: hidden; padding-top: 12px; }
+#search-input-wrap { display: flex; align-items: center; gap: 8px; padding: 0 16px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+#search-input { flex: 1; background: var(--bg-elevated); border: 1px solid var(--border-light); border-radius: 24px; padding: 10px 18px; color: var(--text-primary); font-size: 14px; outline: none; transition: border-color 0.15s; }
+#search-input:focus { border-color: var(--accent); }
+#search-input::placeholder { color: var(--text-muted); }
+#search-clear { color: var(--text-muted); font-size: 16px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
+#search-results { flex: 1; overflow-y: auto; padding-bottom: calc(var(--bottom-nav-h) + 8px); }
+.search-item { padding: 12px 16px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.12s; }
+.search-item:hover { background: var(--bg-surface); }
+.search-item .s-title { font-size: 14px; color: var(--text-primary); margin-bottom: 3px; }
+.search-item .s-date { font-size: 11px; color: var(--text-secondary); font-family: var(--font-ui); }
+.search-item.done-item .s-title { text-decoration: line-through; color: var(--text-muted); }
+.search-item mark { background: var(--accent-glow); color: var(--accent); border-radius: 2px; padding: 0 1px; }
+.search-done-divider { display: flex; align-items: center; gap: 10px; padding: 10px 16px; color: var(--text-muted); font-size: 11px; font-family: var(--font-ui); }
+.search-done-divider::before, .search-done-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+/* =============================================
+   주간 탭
+   ============================================= */
+#tab-weekly { flex-direction: column; background: var(--bg-base); }
+
+/* 주 범위 헤더 */
+#weekly-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+#week-range-label {
+  font-size: 15px; font-weight: 600;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+}
+.week-nav {
+  font-size: 20px; color: var(--text-secondary);
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 8px;
+  border: 1px solid var(--border-light);
+  background: var(--bg-elevated);
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  font-weight: 600;
+}
+.week-nav:hover { background: var(--bg-hover); color: var(--accent); border-color: var(--accent); }
+
+/* 요일 카드 행 */
+#week-day-row-wrap {
+  background: var(--bg-surface);
+  padding: 10px 10px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+#week-day-row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+}
+.week-day-card {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 4px;
+  padding: 8px 4px;
+  border-radius: 10px;
+  cursor: default;
+  transition: background 0.15s;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  position: relative;
+}
+.week-day-card.selected {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.week-day-card.selected .wdc-name,
+.week-day-card.selected .wdc-num { color: #1a1a2e !important; }
+.week-day-card.today {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.week-day-card.today .wdc-name,
+.week-day-card.today .wdc-num { color: #1a1a2e !important; }
+
+.wdc-name {
+  font-size: 10px;
+  font-family: var(--font-ui);
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+.wdc-num {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+}
+.week-day-card.sat .wdc-name,
+.week-day-card.sat .wdc-num { color: #6b9fd4; }
+.week-day-card.sun .wdc-name,
+.week-day-card.sun .wdc-num { color: var(--danger); }
+
+/* 할일 있는 날 점 */
+.week-day-card.has-todo::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.week-day-card.selected.has-todo::after { background: #1a1a2e; }
+.week-day-card.today.has-todo::after { background: #1a1a2e; }
+
+/* 선택 날짜 바 */
+#week-selected-bar {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  background: var(--bg-base);
+}
+#week-selected-label {
+  font-size: 13px;
+  font-family: var(--font-ui);
+  color: var(--text-primary);
+}
+#week-selected-label.week-sat { color: #6b9fd4; }
+#week-selected-label.week-sun { color: var(--danger); }
+
+/* 주간 할일 목록 */
+#weekly-list-section {
+  flex: 1; overflow-y: auto;
+  padding: 8px 0 calc(var(--bottom-nav-h) + 8px);
+  -webkit-overflow-scrolling: touch;
+}
+#weekly-list-section::-webkit-scrollbar { width: 3px; }
+#weekly-list-section::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 2px; }
+
+.week-todo-item {  display: flex; align-items: center;
+  padding: 7px 16px;
+  border-bottom: 1px solid var(--border);
+  gap: 12px;
+  background: var(--bg-base);
+  transition: background 0.12s;
+  overflow: hidden;
+}
+.week-todo-item .todo-text { min-width: 0; overflow: hidden; }
+.week-todo-item .todo-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.week-todo-item:hover { background: var(--bg-surface); }
+.week-todo-item.done { opacity: 0.45; }
+.week-todo-item.done .todo-title { text-decoration: line-through; color: var(--text-done); }
+
+.week-done-divider {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 16px;
+  color: var(--text-muted); font-size: 11px; font-family: var(--font-ui);
+}
+.week-done-divider::before, .week-done-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+/* 주간 날짜 섹션 헤더 */
+.week-section-header {
+  padding: 10px 16px 7px;
+  font-size: 13px; font-weight: 600;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  margin-top: 6px;
+  border-left: 3px solid var(--accent);
+}
+.week-section-header:first-child { margin-top: 0; }
+.week-section-header.week-sat { color: #6b9fd4; border-left-color: #6b9fd4; }
+.week-section-header.week-sun { color: var(--danger); border-left-color: var(--danger); }
+
+/* 달력 콜랩스 핸들 바 */
+#cal-collapse-bar {
+  display: flex; align-items: center; justify-content: center;
+  height: 18px; cursor: pointer;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+#cal-collapse-bar::before {
+  content: '';
+  width: 36px; height: 3px;
+  border-radius: 2px;
+  background: var(--border-light);
+  transition: background 0.15s;
+}
+#cal-collapse-bar:hover::before { background: var(--accent); }
+
+/* 달력 축소 상태 */
+#calendar-section {
+  transition: padding 0.3s cubic-bezier(0.4,0,0.2,1);
+}
+#calendar-section #calendar-header,
+#calendar-section #calendar-weekdays {
+  transition: opacity 0.2s ease, max-height 0.3s cubic-bezier(0.4,0,0.2,1);
+  overflow: hidden;
+  max-height: 60px;
+  opacity: 1;
+}
+#calendar-section.collapsed #calendar-header,
+#calendar-section.collapsed #calendar-weekdays {
+  max-height: 0;
+  opacity: 0;
+  pointer-events: none;
+  margin: 0;
+}
+#calendar-section.collapsed {
+  padding: 6px 12px 2px;
+}
+#calendar-section.collapsed #calendar-grid .cal-day {
+  aspect-ratio: 1.1;
+  font-size: 13px;
+}
+
+
+/* ── 공통 ── */
+.todo-item.swipe-complete { background: var(--accent-glow) !important; }
+
+@media (min-width: 481px) {
+  #app { border-left: 1px solid var(--border); border-right: 1px solid var(--border); box-shadow: 0 0 60px rgba(0,0,0,0.5); }
+}
+
+.spinner { display: none; }
+
+#toast { position: fixed; bottom: calc(var(--bottom-nav-h) + 80px); left: 50%; transform: translateX(-50%) translateY(20px); background: var(--bg-elevated); color: var(--text-primary); padding: 10px 20px; border-radius: 24px; font-size: 13px; border: 1px solid var(--border-light); opacity: 0; transition: opacity 0.2s, transform 0.2s; pointer-events: none; z-index: 200; white-space: nowrap; }
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* =============================================
+   반복 설정
+   ============================================= */
+
+/* 반복 버튼 (상세 섹션 내) */
+.repeat-btn {
+  padding: 7px 18px;
+  border-radius: 20px;
+  font-size: 13px;
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  transition: all 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.repeat-btn:hover { border-color: var(--accent); color: var(--accent); }
+.repeat-btn.active { background: var(--accent); color: #1a1a2e; border-color: var(--accent); font-weight: 600; }
+
+/* 반복 아이콘 */
+.repeat-icon { font-size: 11px; opacity: 0.7; }
+
+/* 반복 모달 오버레이 */
+#repeat-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 150;
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(4px);
+}
+#repeat-overlay.hidden { display: none; }
+
+#repeat-box {
+  background: var(--bg-elevated);
+  border-radius: var(--radius);
+  padding: 20px;
+  width: calc(100% - 40px);
+  max-width: 340px;
+  border: 1px solid var(--border-light);
+}
+
+#repeat-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px;
+  font-size: 15px; font-weight: 500; color: var(--text-primary);
+}
+#repeat-modal-close {
+  color: var(--text-muted); font-size: 18px;
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; transition: background 0.15s;
+}
+#repeat-modal-close:hover { background: var(--bg-hover); }
+
+/* 타입 버튼 행 */
+#rtype-row {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.rtype-btn {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  transition: all 0.15s;
+}
+.rtype-btn:hover { border-color: var(--accent); color: var(--accent); }
+.rtype-btn.active { background: var(--accent); color: #1a1a2e; border-color: var(--accent); font-weight: 600; }
+
+/* 반복 옵션 행 */
+.repeat-option {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 12px;
+  font-size: 13px; color: var(--text-secondary);
+}
+.repeat-option.hidden { display: none; }
+.repeat-option input[type="number"] {
+  width: 64px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  color: var(--text-primary);
+  font-size: 14px; text-align: center;
+  outline: none;
+}
+.repeat-option input[type="number"]:focus { border-color: var(--accent); }
+.repeat-option input[type="date"] {
+  flex: 1;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  color: var(--text-primary);
+  font-size: 13px; outline: none;
+}
+.repeat-option input[type="date"]:focus { border-color: var(--accent); }
+.repeat-option input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.7); }
+.repeat-end-label {
+  display: flex; align-items: center; gap: 6px;
+  cursor: pointer; font-size: 13px; color: var(--text-secondary);
+}
+.repeat-end-label input[type="checkbox"] { accent-color: var(--accent); width: 15px; height: 15px; }
+#repeat-end-date-wrap { margin-top: 8px; display: flex; }
+#repeat-end-date-wrap.hidden { display: none; }
+
+/* 반복 모달 하단 버튼 */
+#repeat-footer {
+  display: flex; gap: 8px; margin-top: 16px;
+}
+.repeat-footer-btn {
+  flex: 1; padding: 11px;
+  border-radius: var(--radius-sm);
+  font-size: 14px; font-weight: 500;
+  transition: opacity 0.15s;
+}
+.repeat-footer-btn.cancel { background: var(--bg-hover); color: var(--text-secondary); }
+.repeat-footer-btn.confirm { background: var(--accent); color: #1a1a2e; }
+.repeat-footer-btn:hover { opacity: 0.85; }
+
+/* =============================================
+   날짜바 + FAB 통합
+   ============================================= */
+#selected-date-bar {
+  padding: 6px 12px 6px 16px;
+  background: var(--bg-base);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 40px;
+}
+#date-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+#cal-toggle-btn {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s, transform 0.15s;
+  border: 1px solid var(--border-light);
+}
+#cal-toggle-btn svg { width: 16px; height: 16px; }
+#cal-toggle-btn:hover { background: var(--bg-hover); color: var(--accent); border-color: var(--accent); }
+#cal-toggle-btn:active { transform: scale(0.92); }
+#fab-add {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #1a1a2e;
+  font-size: 22px; font-weight: 300;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 3px 12px rgba(126,207,160,0.4);
+  flex-shrink: 0;
+  transition: transform 0.15s, box-shadow 0.15s;
+  line-height: 1;
+}
+#fab-add:hover { transform: scale(1.1); }
+#fab-add:active { transform: scale(0.92); }
+
+/* =============================================
+   주간 필터 버튼
+   ============================================= */
+#week-header-right {
+  display: flex; align-items: center; gap: 12px;
+}
+.week-filter-btn {
+  padding: 6px 14px;
+  border-radius: 14px;
+  font-size: 12px; font-weight: 500;
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  transition: all 0.15s;
+}
+.week-filter-btn.active {
+  background: var(--accent);
+  color: #1a1a2e;
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+/* =============================================
+   주간 체크 표시 아이콘
+   ============================================= */
+.weekly-flag-icon { color: var(--accent); font-size: 14px; }
+#weekly-flag-label {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 11px; color: var(--text-secondary);
+  cursor: pointer; flex-shrink: 0;
+  white-space: nowrap;
+}
+#weekly-flag-label input { accent-color: var(--accent); width: 14px; height: 14px; }
+
+/* =============================================
+   창고 체크박스 & 창고 모드
+   ============================================= */
+/* 주간/창고 체크박스 세로 배치 래퍼
+   (기존 #weekly-flag-label의 margin-left:6px 역할을 이 래퍼가 대체) */
+#flags-column {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-left: 6px;
+}
+/* 세로 배치 시 양쪽 체크박스 폰트/아이콘 완전히 동일하게 맞춤.
+   !important로 다른 룰(예: label 기본 스타일, detail-row 스타일)이 덮어쓰는 것 방지 */
+#detail-section #flags-column > label#weekly-flag-label,
+#detail-section #flags-column > label#storage-flag-label {
+  font-size: 11px !important;
+  color: var(--text-secondary) !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  cursor: pointer !important;
+  white-space: nowrap !important;
+  line-height: 1.2 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+#detail-section #flags-column > label#weekly-flag-label > input,
+#detail-section #flags-column > label#storage-flag-label > input {
+  accent-color: var(--accent) !important;
+  width: 14px !important;
+  height: 14px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+#detail-section #flags-column > label#weekly-flag-label > span,
+#detail-section #flags-column > label#storage-flag-label > span {
+  font-size: 11px !important;
+  line-height: 1.2 !important;
+  color: var(--text-secondary) !important;
+}
+#storage-flag-label.disabled { opacity: 0.45 !important; cursor: not-allowed !important; }
+#storage-flag-label.disabled input { cursor: not-allowed !important; }
+
+/* 모달 내 중요도 버튼은 창고 체크박스 세로 2줄과 시각적 균형 맞추기 위해
+   padding을 살짝 높임 (할일 아이템의 imp-badge는 건드리지 않음) */
+#modal-box .imp-btn { padding: 7px 9px; }
+
+/* ── 창고 모드: 주간/날짜/상기/반복/리스트 비활성화 ──
+   :has() 의존 없이 명시적 클래스로 제어 (JS가 특정 요소에 storage-disabled 클래스를 부여) */
+#detail-section.storage-mode .storage-disabled {
+  opacity: 0.4 !important;
+  pointer-events: none !important;
+  user-select: none !important;
+}
+/* 주간 체크박스도 창고 모드에선 비활성 */
+#detail-section.storage-mode #weekly-flag-label {
+  opacity: 0.4 !important;
+  pointer-events: none !important;
+}
+
+/* =============================================
+   창고 탭 — 할일/주간 탭과 동일 디자인 적용
+   ============================================= */
+#tab-storage { flex-direction: column; background: var(--bg-base); }
+
+/* 헤더: 가운데 정렬 + 볼드 + 구분선 (주간탭 #weekly-header 참고) */
+#storage-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 16px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  min-height: 44px;
+}
+#storage-header-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  letter-spacing: -0.2px;
+}
+
+#storage-list-section {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: calc(var(--bottom-nav-h) + 8px);
+  -webkit-overflow-scrolling: touch;
+}
+#storage-list-section::-webkit-scrollbar { width: 3px; }
+#storage-list-section::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 2px; }
+
+/* 창고 목록: 할일 목록과 동일한 ul 스타일 */
+#storage-todo-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+/* 창고 아이템은 .todo-item 클래스를 공유하므로 기본 디자인은 동일.
+   여기선 창고 전용 조정만 추가 */
+.storage-item .storage-check-spacer {
+  /* 체크박스 자리에 투명 스페이서: 할일 탭과 동일한 좌측 정렬 유지 */
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* 검색 탭 — 창고 항목 날짜 표시 */
+.s-date-storage { color: var(--accent) !important; font-weight: 500; }
+
+/* ※ 창고 액션 시트(모바일) / PC 드롭다운의 스타일은 storage.js 내부에서
+     JS 인라인 스타일로 직접 부여됩니다. CSS 룰을 두지 않는 이유:
+       - 클래스 의존 시 다른 룰과의 우선순위 충돌/캐시 이슈 발생 경험
+       - 인라인 스타일이 가장 확실하게 렌더링 보장 */
+
+/* =============================================
+   설정 슬라이드 패널
+   ============================================= */
+#settings-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 200;
+  backdrop-filter: blur(2px);
+}
+#settings-overlay.hidden { display: none; }
+
+#settings-panel {
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  width: 280px;
+  background: var(--bg-surface);
+  z-index: 201;
+  transform: translateX(-100%);
+  transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+  display: flex; flex-direction: column;
+  box-shadow: 4px 0 24px rgba(0,0,0,0.4);
+}
+#settings-panel.hidden { display: none; }
+#settings-panel.open { transform: translateX(0); }
+
+#settings-panel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 16px 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: 17px; font-weight: 600; color: var(--text-primary);
+}
+#settings-close {
+  color: var(--text-muted); font-size: 18px;
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; transition: background 0.15s;
+}
+#settings-close:hover { background: var(--bg-hover); }
+
+#settings-menu { padding: 8px 0; }
+.settings-menu-item {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; padding: 14px 16px;
+  color: var(--text-primary); font-size: 14px;
+  transition: background 0.15s; text-align: left;
+}
+.settings-menu-item:hover { background: var(--bg-hover); }
+.settings-menu-icon { font-size: 18px; }
+.settings-menu-label { flex: 1; }
+.settings-menu-arrow { color: var(--text-muted); font-size: 18px; }
+
+/* =============================================
+   반복함 패널
+   ============================================= */
+#repeats-panel {
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  width: 280px;
+  background: var(--bg-elevated);
+  z-index: 202;
+  transform: translateX(-100%);
+  transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+  display: flex; flex-direction: column;
+}
+#repeats-panel.hidden { display: none; }
+#repeats-panel.open { transform: translateX(0); }
+
+#repeats-panel-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 20px 16px 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: 16px; font-weight: 600; color: var(--text-primary);
+}
+#repeats-back {
+  font-size: 24px; color: var(--text-secondary);
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+}
+
+#repeats-list { flex: 1; overflow-y: auto; padding: 8px 0; }
+
+.repeat-list-item {
+  display: flex; align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  gap: 10px;
+}
+.repeat-item-info { flex: 1; min-width: 0; }
+.repeat-item-title {
+  font-size: 13px; color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.repeat-item-sub { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+.repeat-item-del {
+  padding: 5px 10px; border-radius: var(--radius-sm);
+  font-size: 12px; color: var(--danger);
+  border: 1px solid var(--danger);
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+.repeat-item-del:hover { background: rgba(224,92,106,0.1); }
+
+.repeat-del-options {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 8px 16px;
+  background: var(--bg-hover);
+  border-bottom: 1px solid var(--border);
+}
+.repeat-del-options button {
+  padding: 8px 12px; border-radius: var(--radius-sm);
+  font-size: 13px; text-align: left;
+  color: var(--danger); transition: background 0.12s;
+}
+.repeat-del-options button.cancel { color: var(--text-secondary); }
+.repeat-del-options button:hover { background: var(--bg-elevated); }
+
+/* =============================================
+   반복 상세 옵션 (repeat modal 안)
+   ============================================= */
+.repeat-detail { margin-bottom: 12px; }
+.repeat-detail.hidden { display: none; }
+.repeat-sub-label {
+  display: block; font-size: 11px; color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+#repeat-weekday-btns, #repeat-custom-day-btns {
+  display: flex; gap: 5px; flex-wrap: wrap;
+}
+.rday-btn {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  font-size: 12px; font-weight: 500;
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  transition: all 0.15s;
+  display: flex; align-items: center; justify-content: center;
+}
+.rday-btn:hover { border-color: var(--accent); color: var(--accent); }
+.rday-btn.active { background: var(--accent); color: #1a1a2e; border-color: var(--accent); font-weight: 700; }
+
+#repeat-monthly-mode-row {
+  display: flex; gap: 6px; margin-bottom: 10px;
+}
+.rmonth-mode-btn {
+  padding: 5px 12px; border-radius: 14px; font-size: 12px;
+  border: 1px solid var(--border-light); color: var(--text-secondary);
+  transition: all 0.15s;
+}
+.rmonth-mode-btn.active { background: var(--accent); color: #1a1a2e; border-color: var(--accent); font-weight: 600; }
+
+select {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  color: var(--text-primary);
+  font-size: 12px; outline: none;
+}
+select:focus { border-color: var(--accent); }
+
+/* ── 반복 삭제 선택 시트 (action-box 내부 오버레이) ── */
+.repeat-delete-sheet {
+  position: absolute;
+  inset: 0;
+  background: var(--bg-elevated, #1e1e2e);
+  border-radius: var(--radius, 16px) var(--radius, 16px) 0 0;
+  padding: 12px 12px 16px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  animation: slideUp 0.18s ease;
+  overflow-y: auto;
+}
+
+.rds-title {
+  font-size: 13px;
+  color: var(--text-muted, #888);
+  text-align: center;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border, #333);
+  margin-bottom: 2px;
+  flex-shrink: 0;
+}
+
+.rds-btn {
+  width: 100%;
+  padding: 11px 16px;
+  background: var(--surface2, #2a2a3e);
+  border: none;
+  border-radius: 10px;
+  color: var(--text, #eee);
+  font-size: 14px;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+.rds-btn:active { background: var(--surface3, #333); }
+.rds-btn.danger { color: var(--danger, #e05c6a); }
+.rds-btn.cancel {
+  color: var(--text-muted, #888);
+  background: transparent;
+  text-align: center;
+  margin-top: 2px;
+}
+
+/* 반복함 삭제 옵션 개선 */
+.repeat-del-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 10px;
+  background: var(--surface2, #2a2a3e);
+  border-radius: 10px;
+}
+.repeat-del-options button {
+  padding: 10px 14px;
+  background: var(--surface3, #333);
+  border: none;
+  border-radius: 8px;
+  color: var(--text, #eee);
+  font-size: 14px;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.repeat-del-options button.danger { color: var(--danger, #e05c6a); }
+.repeat-del-options button.cancel { color: var(--text-muted, #888); background: transparent; }
+/* =============================================
+   체크리스트 토글 라벨
+   ============================================= */
+#checklist-toggle-label {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 11px; color: var(--text-secondary);
+  cursor: pointer; flex-shrink: 0; margin-left: 6px;
+  white-space: nowrap;
+}
+#checklist-toggle-label input { accent-color: var(--accent); width: 14px; height: 14px; }
+
+/* =============================================
+   체크리스트 모달
+   ============================================= */
+#checklist-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 160;
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(4px);
+}
+#checklist-overlay.hidden { display: none; }
+
+#checklist-box {
+  background: var(--bg-elevated);
+  border-radius: var(--radius);
+  padding: 20px;
+  width: calc(100% - 40px);
+  max-width: 360px;
+  max-height: 80vh;
+  display: flex; flex-direction: column;
+  border: 1px solid var(--border-light);
+  gap: 12px;
+}
+
+#checklist-header {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 15px; font-weight: 500; color: var(--text-primary);
+  flex-shrink: 0;
+}
+#checklist-modal-close {
+  color: var(--text-muted); font-size: 18px;
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; transition: background 0.15s;
+}
+#checklist-modal-close:hover { background: var(--bg-hover); }
+
+#checklist-items {
+  flex: 1; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 6px;
+  min-height: 0;
+}
+
+.checklist-item-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px;
+  background: var(--bg-surface);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  transition: background 0.12s;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.checklist-item-row.cl-dragging {
+  opacity: 0.3;
+}
+.checklist-item-row.cl-drag-over-top {
+  border-top: 2.5px solid var(--accent);
+}
+.checklist-item-row.cl-drag-over-bottom {
+  border-bottom: 2.5px solid var(--accent);
+}
+.cl-drag-clone {
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+
+.checklist-drag-handle {
+  color: var(--text-muted); cursor: grab;
+  flex-shrink: 0; padding: 2px 4px;
+  touch-action: none;
+  display: flex; align-items: center;
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none;
+}
+.checklist-drag-handle:active { cursor: grabbing; }
+
+.checklist-item-check {
+  width: 16px; height: 16px;
+  accent-color: var(--accent);
+  flex-shrink: 0; cursor: pointer;
+}
+
+.checklist-item-text {
+  flex: 1; background: transparent;
+  border: none; outline: none;
+  color: var(--text-primary); font-size: 14px;
+  font-family: var(--font-main);
+  min-width: 0;
+}
+.checklist-item-text::placeholder { color: var(--text-muted); }
+
+.checklist-item-del {
+  color: var(--text-muted); font-size: 13px;
+  flex-shrink: 0; padding: 2px 6px;
+  border-radius: 4px; transition: color 0.15s, background 0.15s;
+}
+.checklist-item-del:hover { color: var(--danger); background: rgba(224,92,106,0.1); }
+
+#checklist-add-row {
+  display: flex; gap: 8px; align-items: center;
+  flex-shrink: 0;
+}
+#checklist-input {
+  flex: 1; background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px; color: var(--text-primary);
+  font-size: 14px; outline: none;
+  font-family: var(--font-main);
+  transition: border-color 0.15s;
+}
+#checklist-input:focus { border-color: var(--accent); }
+#checklist-input::placeholder { color: var(--text-muted); }
+
+#checklist-add-btn {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  background: var(--accent); color: #1a1a2e;
+  font-size: 20px; font-weight: 300;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: transform 0.15s;
+}
+#checklist-add-btn:hover { transform: scale(1.08); }
+
+#checklist-footer {
+  display: flex; gap: 8px;
+  flex-shrink: 0;
+}
+.checklist-footer-btn {
+  flex: 1; padding: 11px;
+  border-radius: var(--radius-sm);
+  font-size: 14px; font-weight: 500;
+  transition: opacity 0.15s;
+}
+.checklist-footer-btn.cancel { background: var(--bg-hover); color: var(--text-secondary); }
+.checklist-footer-btn.confirm { background: var(--accent); color: #1a1a2e; }
+.checklist-footer-btn:hover { opacity: 0.85; }
+
+/* =============================================
+   체크리스트 아이콘 & 진행도 (할일/주간 탭)
+   ============================================= */
+.checklist-icon {
+  font-size: 14px;
+  color: var(--accent);
+  margin-right: 2px;
+}
+.checklist-progress {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+}
+
+/* =============================================
+   반복 수정 오버레이
+   ============================================= */
+#repeat-edit-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.55);
+  z-index: 170;
+  display: flex; align-items: flex-end; justify-content: center;
+  backdrop-filter: blur(3px);
+}
+#repeat-edit-overlay.hidden { display: none; }
+
+#repeat-edit-box {
+  background: var(--bg-elevated);
+  width: 100%; max-width: 480px;
+  border-radius: var(--radius) var(--radius) 0 0;
+  padding: 12px 16px 28px;
+  display: flex; flex-direction: column; gap: 6px;
+  animation: slideUp 0.2s ease;
+}
+
+/* ─── 체크리스트 열기 버튼 (항목 있을 때) ─── */
+.checklist-open-btn {
+  padding: 7px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  background: transparent;
+  transition: all 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-family: var(--font-main);
+}
+.checklist-open-btn:hover { background: var(--accent-glow); }
+.checklist-open-btn.active {
+  background: var(--accent);
+  color: #1a1a2e;
+  font-weight: 600;
+}
+.checklist-open-btn.hidden { display: none; }
+#checklist-toggle-label.hidden { display: none; }
+
+/* =============================================
+   라이트 모드
+   ============================================= */
+body.light-mode {
+  --bg-base:        #f4f5f0;
+  --bg-surface:     #ebeee7;
+  --bg-elevated:    #e2e5dc;
+  --bg-hover:       #d8dcd2;
+  --accent:         #3a9e6a;
+  --accent-dim:     #2d7d52;
+  --accent-glow:    rgba(58, 158, 106, 0.18);
+  --text-primary:   #1e2028;
+  --text-secondary: #4a5060;
+  --text-muted:     #8a8f9e;
+  --text-done:      #aab0be;
+  --border:         #cdd0c8;
+  --border-light:   #bdc1b8;
+  --danger:         #c94050;
+  --imp-1:          #7a7a7a;
+  --imp-2:          #b08a30;
+  --imp-3:          #c85820;
+}
+
+/* 라이트 모드 스플래시/로그인 배경 */
+body.light-mode #splash-screen { background: #f4f5f0; }
+body.light-mode #login-screen  { background: #f4f5f0; }
+body.light-mode #login-box {
+  background: #ebeee7;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+}
+body.light-mode #login-box input {
+  background: #f4f5f0;
+  border-color: #cdd0c8;
+  color: #1e2028;
+}
+body.light-mode #login-box input:focus { border-color: #7ecfa0; }
+body.light-mode #login-title { color: #1e2028; }
+
+/* 달력 선택 날짜 글씨 (다크처럼 어두운 색 유지) */
+body.light-mode .cal-day.selected { color: #fff; }
+body.light-mode .cal-day.selected::before { background: var(--accent); }
+body.light-mode .cal-day.selected.has-todo span::after { background: #fff; }
+body.light-mode .cal-day.selected.past-undone span::after { background: #fff; }
+
+/* 선택된 날의 텍스트가 녹색 배경 위에서 잘 보이도록 */
+body.light-mode .week-day-card.today .wdc-name,
+body.light-mode .week-day-card.today .wdc-num,
+body.light-mode .week-day-card.selected .wdc-name,
+body.light-mode .week-day-card.selected .wdc-num { color: #fff !important; }
+
+/* 토스트 라이트 */
+body.light-mode #toast {
+  background: #1e2028;
+  color: #f0f2ee;
+  border-color: #333;
+}
+
+/* 스크롤바 */
+body.light-mode #todo-list-section::-webkit-scrollbar-thumb { background: #bdc1b8; }
+body.light-mode #weekly-list-section::-webkit-scrollbar-thumb { background: #bdc1b8; }
+
+/* 라이트 모드 토글 버튼 */
+#lightmode-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  gap: 0;
+  background: none;
+  border: none;
+  padding: 0;
+}
+.lm-toggle-track {
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--bg-hover);
+  border: 1.5px solid var(--border-light);
+  position: relative;
+  transition: background 0.2s, border-color 0.2s;
+}
+.lm-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: transform 0.2s, background 0.2s;
+}
+body.light-mode .lm-toggle-track {
+  background: var(--accent-glow);
+  border-color: var(--accent);
+}
+body.light-mode .lm-toggle-thumb {
+  transform: translateX(16px);
+  background: var(--accent);
+}
+
+/* 라이트 모드 select */
+body.light-mode select {
+  background: #ebeee7;
+  color: #1e2028;
+  border-color: #bdc1b8;
+}
+
+/* 반복 설정 모달 */
+body.light-mode #repeat-box,
+body.light-mode #checklist-box,
+body.light-mode #year-box,
+body.light-mode #month-box { border-color: #bdc1b8; }
+
+/* 설정 패널 */
+body.light-mode #settings-panel { box-shadow: 4px 0 24px rgba(0,0,0,0.15); }
+body.light-mode #repeats-panel { box-shadow: 4px 0 24px rgba(0,0,0,0.15); }
+
+/* 로그아웃 모달 */
+body.light-mode #logout-modal > div {
+  background: #ebeee7;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+}
+
+/* 메모↔날짜 사이 여백 */
+#detail-section .detail-row:has(#input-date) {
+  margin-top: 10px;
+}
+
+/* =============================================
+   5가지 컬러 테마 (배경 전체 톤이 바뀌는 독립 테마)
+   ============================================= */
+
+/* 토글 버튼: 컬러 테마 활성 시 비활성화 */
+body.theme-active #lightmode-toggle {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+/* 1. 연한 녹색 (Sage) */
+body.theme-sage {
+  --bg-base:        #eef5ee;
+  --bg-surface:     #e4ede4;
+  --bg-elevated:    #d8e8d8;
+  --bg-hover:       #cce0cc;
+  --accent:         #3a8a5a;
+  --accent-dim:     #2d6e48;
+  --accent-glow:    rgba(58,138,90,0.15);
+  --text-primary:   #1a2e1a;
+  --text-secondary: #4a6a4a;
+  --text-muted:     #7a9a7a;
+  --text-done:      #aac0aa;
+  --border:         #c4d8c4;
+  --border-light:   #b0ccb0;
+  --danger:         #c84040;
+  --imp-1:          #7a8a7a;
+  --imp-2:          #8a7030;
+  --imp-3:          #a04820;
+}
+body.theme-sage #splash-screen,
+body.theme-sage #login-screen { background: #eef5ee; }
+body.theme-sage .cal-day.selected { color: #fff; }
+
+/* 2. 하늘색 (Sky) */
+body.theme-sky {
+  --bg-base:        #eef4fa;
+  --bg-surface:     #e2ecf6;
+  --bg-elevated:    #d4e4f0;
+  --bg-hover:       #c4d8ec;
+  --accent:         #2868c0;
+  --accent-dim:     #1e50a0;
+  --accent-glow:    rgba(40,104,192,0.15);
+  --text-primary:   #0e1e30;
+  --text-secondary: #3a5878;
+  --text-muted:     #6a8aaa;
+  --text-done:      #a0b8cc;
+  --border:         #b8d0e8;
+  --border-light:   #a0c0e0;
+  --danger:         #c03040;
+  --imp-1:          #6a7a8a;
+  --imp-2:          #7a6828;
+  --imp-3:          #984030;
+}
+body.theme-sky #splash-screen,
+body.theme-sky #login-screen { background: #eef4fa; }
+body.theme-sky .cal-day.selected { color: #fff; }
+
+/* 3. 연한 붉은색 (Rose) */
+body.theme-rose {
+  --bg-base:        #faf0f0;
+  --bg-surface:     #f4e4e4;
+  --bg-elevated:    #eed8d8;
+  --bg-hover:       #e8cccc;
+  --accent:         #c03848;
+  --accent-dim:     #a02838;
+  --accent-glow:    rgba(192,56,72,0.15);
+  --text-primary:   #2e1010;
+  --text-secondary: #6a3838;
+  --text-muted:     #9a6868;
+  --text-done:      #c0a0a0;
+  --border:         #e0c0c0;
+  --border-light:   #d4b0b0;
+  --danger:         #b02020;
+  --imp-1:          #8a6868;
+  --imp-2:          #8a6028;
+  --imp-3:          #904018;
+}
+body.theme-rose #splash-screen,
+body.theme-rose #login-screen { background: #faf0f0; }
+body.theme-rose .cal-day.selected { color: #fff; }
+
+/* 4. 연한 자주색 (Lavender) */
+body.theme-lavender {
+  --bg-base:        #f4f0fa;
+  --bg-surface:     #eae4f4;
+  --bg-elevated:    #dfd8ee;
+  --bg-hover:       #d4ccee;
+  --accent:         #7040c0;
+  --accent-dim:     #5830a0;
+  --accent-glow:    rgba(112,64,192,0.15);
+  --text-primary:   #1a0e30;
+  --text-secondary: #4a3870;
+  --text-muted:     #7a68a0;
+  --text-done:      #b0a0c8;
+  --border:         #c8bce0;
+  --border-light:   #bcaed8;
+  --danger:         #c02848;
+  --imp-1:          #7a6890;
+  --imp-2:          #806830;
+  --imp-3:          #904028;
+}
+body.theme-lavender #splash-screen,
+body.theme-lavender #login-screen { background: #f4f0fa; }
+body.theme-lavender .cal-day.selected { color: #fff; }
+
+/* 5. 진한 청색 (Navy) */
+body.theme-navy {
+  --bg-base:        #0e1428;
+  --bg-surface:     #141c38;
+  --bg-elevated:    #1a2448;
+  --bg-hover:       #202c58;
+  --accent:         #4878e8;
+  --accent-dim:     #3060c0;
+  --accent-glow:    rgba(72,120,232,0.18);
+  --text-primary:   #d0e0f8;
+  --text-secondary: #7090c0;
+  --text-muted:     #405880;
+  --text-done:      #506070;
+  --border:         #1e2c50;
+  --border-light:   #283860;
+  --danger:         #e05060;
+  --imp-1:          #506070;
+  --imp-2:          #806020;
+  --imp-3:          #904030;
+}
