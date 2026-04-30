@@ -1,0 +1,398 @@
+/* =============================================
+   style-pc.css — PC 전용 레이아웃
+   index-pc.html 전용. 기존 style.css 위에 로드.
+   기존 파일 일체 수정 없음.
+   ============================================= */
+
+:root {
+  /* 풀화면(1400px)→520px, 절반(700px)→364px(30%감소), 이하 364px 유지 */
+  --pc-left-w: clamp(364px, 37.14vw, 520px);
+}
+
+/* ── #app: 좌측 동적, 중앙 흡수, 우측 최솟값 보장 ── */
+#app {
+  max-width: none !important;
+  height: 100dvh !important;
+  display: grid !important;
+  grid-template-columns: var(--pc-left-w) 1.4fr minmax(240px, 1fr) !important;
+  grid-template-rows: 100dvh !important;
+  overflow: hidden !important;
+  border-left: none !important;
+  border-right: none !important;
+  box-shadow: none !important;
+}
+
+/* 기존 하단 탭바 숨김 */
+#bottom-nav { display: none !important; }
+
+/* 기존 패딩 리셋 */
+#todo-list-section   { padding-bottom: 8px !important; }
+#weekly-list-section { padding-bottom: 8px !important; }
+#storage-list-section{ padding-bottom: 8px !important; }
+#search-results      { padding-bottom: 8px !important; }
+
+/* =============================================
+   좌측: 가로 탭 1줄 + 달력 (고정 높이)
+   ============================================= */
+#pc-left {
+  grid-column: 1;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 5;
+}
+
+/* ── 가로 탭: 한 줄 ── */
+#pc-nav-tabs {
+  display: flex;
+  flex-direction: row;          /* 가로 배치 */
+  flex-shrink: 0;
+  height: 52px;
+  border-bottom: 1px solid var(--border);
+  width: 100%;
+}
+
+.pc-nav-btn {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: row;          /* 아이콘+텍스트 가로 */
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-family: var(--font-ui);
+  font-weight: 500;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  border-bottom: 2.5px solid transparent;
+  border-top: none; border-left: none; border-right: none;
+  cursor: pointer;
+  background: none;
+  padding: 0;
+  white-space: nowrap;
+}
+.pc-nav-btn svg { width: 24px; height: 24px; flex-shrink: 0; }
+.pc-nav-btn { font-size: 13px; gap: 6px; }
+.pc-nav-btn:hover { background: var(--bg-hover); color: var(--text-secondary); }
+.pc-nav-btn.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  background: var(--accent-glow);
+}
+
+/* ── 달력: aspect-ratio로 높이가 너비에 비례 → 화면 축소 시 함께 줄어듦 ── */
+/* 기준: 너비 520px → 높이 560px (520:560 = 13:14 비율) */
+#pc-left #calendar-section {
+  flex-shrink: 0;
+  aspect-ratio: 520 / 560;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 8px 6px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+}
+#pc-left #calendar-header   { margin-bottom: 4px; flex-shrink: 0; }
+#pc-left #calendar-weekdays { margin-bottom: 1px; flex-shrink: 0; }
+
+/* 달력 그리드: 남은 높이를 6행이 균등 분할 */
+#pc-left #calendar-grid {
+  flex: 1;
+  grid-auto-rows: 1fr;
+}
+
+/* 달력 셀: 폰트 동적 크기 (풀화면 22px, 절반 화면 ~14px) */
+#pc-left .cal-day {
+  aspect-ratio: unset !important;
+  font-size: clamp(14px, 1.6vw, 22px);
+}
+
+/* 달력 today/selected 원 크기: 동적 */
+#pc-left .cal-day.today::before,
+#pc-left .cal-day.selected::before {
+  width:  clamp(28px, 2.9vw, 40px);
+  height: clamp(28px, 2.9vw, 40px);
+}
+
+
+/* 달력 헤더 높이 2배, 버튼 크게 */
+#pc-left #calendar-header {
+  margin-bottom: 6px;
+  flex-shrink: 0;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+#pc-left .cal-nav {
+  width: 72px !important;
+  height: 40px !important;
+  border-radius: 20px !important;
+  font-size: 28px !important;
+  background: var(--bg-elevated) !important;
+  border: 1px solid var(--border-light) !important;
+  flex-shrink: 0;
+}
+#pc-left .cal-nav:hover {
+  background: var(--bg-hover) !important;
+  color: var(--accent) !important;
+  border-color: var(--accent) !important;
+}
+#pc-left .cal-thismonth-btn {
+  font-size: 14px !important;
+  padding: 7px 14px !important;
+  border-radius: 16px !important;
+}
+#pc-left #cal-title {
+  font-size: 20px !important;
+}
+#pc-left .cal-year-btn,
+#pc-left .cal-month-btn {
+  font-size: 22px !important;
+}
+#pc-left .cal-day.has-todo span::after {
+  width: 7px !important;
+  height: 7px !important;
+  margin-top: 3px !important;
+}
+#pc-left .cal-day.past-undone span::after {
+  width: 7px !important;
+  height: 7px !important;
+  margin-top: 3px !important;
+}
+
+/* 달력 아래 남은 공간 */
+#pc-left-footer {
+  flex: 1;
+  background: var(--bg-surface);
+}
+
+/* =============================================
+   중앙: 날짜줄(첫행) + 할일 목록
+   ============================================= */
+#pc-center {
+  grid-column: 2;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid var(--border);
+  background: var(--bg-base);
+}
+
+/* 날짜줄: 중앙 최상단 고정 행 */
+#pc-center #selected-date-bar {
+  flex-shrink: 0;
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: flex-start !important;
+  align-items: center !important;
+  gap: 0;
+}
+
+/* 액션 버튼 그룹: 왼쪽 고정 */
+#pc-center #date-bar-actions {
+  flex-shrink: 0;
+  order: 0;
+}
+
+/* 날짜 텍스트: 버튼 바로 우측, 여백 추가 */
+#pc-center #selected-date-label {
+  font-size: 18px !important;
+  font-weight: 700 !important;
+  flex: 0 !important;
+  white-space: nowrap !important;
+  text-align: left !important;
+  margin-left: 20px !important;
+  order: 1;
+}
+
+/* 달력 접기 버튼 숨김 */
+#pc-center #cal-toggle-btn { display: none !important; }
+
+/* 탭 콘텐츠 */
+#pc-center .tab-content         { flex: 1; overflow: hidden; min-height: 0; }
+#pc-center #tab-todo            { flex-direction: column; }
+#pc-center #todo-list-section   { flex: 1; overflow-y: auto; }
+#pc-center #tab-weekly          { flex-direction: column; }
+#pc-center #weekly-list-section { flex: 1; overflow-y: auto; }
+#pc-center #tab-storage         { flex-direction: column; }
+#pc-center #storage-list-section{ flex: 1; overflow-y: auto; }
+#pc-center #tab-search          { flex-direction: column; }
+#pc-center #search-container    { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+#pc-center #search-results      { flex: 1; overflow-y: auto; }
+
+/* =============================================
+   우측: 모달 표시 영역
+   ============================================= */
+#pc-right {
+  grid-column: 3;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-base);
+  position: relative;   /* 모달 absolute 기준점 */
+}
+
+/* 선택 전 플레이스홀더 */
+#pc-right-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-muted);
+  font-size: 13px;
+  gap: 12px;
+  opacity: 0.45;
+  font-family: var(--font-ui);
+}
+.pc-right-empty-icon { font-size: 36px; }
+
+/* ── 핵심: 모달 오버레이를 #pc-right 안에 고정 ── */
+body.pc-layout #modal-overlay {
+  position: absolute !important;
+  inset: 0 !important;
+  background: transparent !important;
+  backdrop-filter: none !important;
+  align-items: flex-start !important;
+  z-index: 10 !important;
+}
+
+/* 모달 박스: #pc-right 전체를 채움, 세로 스크롤 */
+body.pc-layout #modal-box {
+  border-radius: 0 !important;
+  max-width: none !important;
+  width: 100% !important;
+  max-height: none !important;
+  height: 100% !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  animation: none !important;
+  box-shadow: none !important;
+  background: var(--bg-elevated) !important;
+  display: block !important;    /* flex 대신 block → 자연스러운 스크롤 */
+  box-sizing: border-box !important;
+}
+
+/* detail-section: 일반 블록 */
+body.pc-layout #detail-section {
+  display: block !important;
+  overflow: visible !important;
+}
+
+/* 모든 detail-row: 좁아지면 줄바꿈 */
+body.pc-layout .detail-row {
+  flex-wrap: wrap !important;
+  row-gap: 6px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* 중요도 버튼 그룹: 줄바꿈 허용 */
+body.pc-layout #importance-btns {
+  flex-wrap: wrap !important;
+}
+
+/* 제목 행: 좁아지면 줄바꿈 */
+body.pc-layout #modal-title-row {
+  flex-wrap: wrap !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* 제목 입력: 너비 제한 */
+body.pc-layout #input-title {
+  width: 100% !important;
+  box-sizing: border-box !important;
+  min-width: 0 !important;
+}
+
+/* 메모 textarea: 고정 높이, 내용 넘치면 스크롤 */
+body.pc-layout #input-memo {
+  flex: none !important;
+  height: 30vh !important;
+  min-height: 80px !important;
+  max-height: 30vh !important;
+  overflow-y: auto !important;
+  resize: none !important;
+  font-size: 15px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* 저장 버튼 */
+body.pc-layout #modal-save {
+  margin-top: 12px !important;
+  margin-bottom: 16px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* 메모↔날짜 사이 여백 */
+body.pc-layout #detail-section .detail-row:has(#input-date) {
+  margin-top: 10px !important;
+}
+
+/* ── 반복설정/체크리스트 오버레이: pc-right 안에 absolute로 하단에 표시 ── */
+body.pc-layout #repeat-overlay,
+body.pc-layout #checklist-overlay,
+body.pc-layout #repeat-edit-overlay {
+  position: absolute !important;
+  inset: auto 0 0 0 !important;   /* 하단에 붙음 */
+  background: rgba(0,0,0,0.25) !important;
+  backdrop-filter: none !important;
+  align-items: flex-end !important;
+  z-index: 20 !important;
+}
+
+/* 반복/체크리스트 박스: 너비 100% */
+body.pc-layout #repeat-box,
+body.pc-layout #checklist-box,
+body.pc-layout #repeat-edit-box {
+  width: 100% !important;
+  max-width: none !important;
+  max-height: 60vh !important;
+  overflow-y: auto !important;
+  border-radius: var(--radius) var(--radius) 0 0 !important;
+}
+
+/* =============================================
+   PC 드롭다운 (액션 팝업 대체)
+   ============================================= */
+#pc-action-dropdown {
+  position: fixed;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  z-index: 500; min-width: 154px; overflow: hidden;
+  animation: pcDropIn 0.14s ease;
+}
+@keyframes pcDropIn {
+  from { opacity: 0; transform: translateY(-5px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.pc-dropdown-btn {
+  display: block; width: 100%; padding: 10px 16px;
+  font-size: 13px; color: var(--text-primary);
+  text-align: left; border: none; background: none;
+  cursor: pointer; transition: background 0.12s;
+  font-family: var(--font-main);
+  border-bottom: 1px solid var(--border);
+}
+.pc-dropdown-btn:last-child { border-bottom: none; }
+.pc-dropdown-btn:hover { background: var(--bg-hover); }
+.pc-dropdown-btn.danger { color: var(--danger); }
+
+/* =============================================
+   설정/반복함 패널
+   ============================================= */
+body.pc-layout #settings-panel   { width: var(--pc-left-w); }
+body.pc-layout #settings-overlay { background: rgba(0,0,0,0.15); }
+body.pc-layout #repeats-panel    { width: var(--pc-left-w); }
+
+/* action-popup: PC에서 드롭다운으로 대체 */
+body.pc-layout #action-popup { display: none !important; }
