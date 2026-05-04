@@ -729,7 +729,14 @@ document.addEventListener('DOMContentLoaded', () => {
       const lineText  = val.substring(lineStart, pos);
       if (/^\d+\.$/.test(lineText)) {
         e.preventDefault();
-        const num = parseInt(lineText);
+        // 이전 번호 줄 기준으로 다음 번호 결정 (빈 줄 건너뜀)
+        const prevLines = val.substring(0, lineStart).split('\n');
+        let prevMatch = null;
+        for (let k = prevLines.length - 1; k >= 0; k--) {
+          const m = prevLines[k].match(/^ {4}(\d+)\. /);
+          if (m) { prevMatch = m; break; }
+        }
+        const num = prevMatch ? parseInt(prevMatch[1]) + 1 : parseInt(lineText);
         const prefix = `${num}. `;
         const indent = '    '; // 들여쓰기 4칸
         const newLine = indent + prefix;
@@ -773,6 +780,44 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 });
+
+/* ── 메모 자동 번호 재정렬 (삭제 시) ── */
+(function() {
+  function _renumberLines(text) {
+    const lines = text.split('\n');
+    let changed = false;
+    let i = 0;
+    while (i < lines.length) {
+      if (/^ {4}\d+\. /.test(lines[i])) {
+        const startNum = parseInt(lines[i].match(/^ {4}(\d+)\. /)[1]);
+        let j = i, counter = startNum;
+        while (j < lines.length && /^ {4}\d+\. /.test(lines[j])) {
+          const newLine = lines[j].replace(/^( {4})\d+(\. )/, '$1' + counter + '$2');
+          if (newLine !== lines[j]) { lines[j] = newLine; changed = true; }
+          counter++;
+          j++;
+        }
+        i = j;
+      } else {
+        i++;
+      }
+    }
+    return changed ? lines.join('\n') : text;
+  }
+
+  document.addEventListener('input', function(e) {
+    const el = e.target;
+    if (el.id !== 'input-memo') return;
+    const val = el.value;
+    const renum = _renumberLines(val);
+    if (renum !== val) {
+      const s = el.selectionStart;
+      el.value = renum;
+      el.selectionStart = el.selectionEnd = s;
+    }
+  });
+})();
+
 (function() {
   const _orig = window.openActionPopup;
   window.openActionPopup = function(id, fromWeekly, targetDate, todo) {

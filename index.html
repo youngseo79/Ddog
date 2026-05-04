@@ -653,6 +653,28 @@ document.addEventListener('input', e => {
 
 /* ── 메모 자동 번호 리스트 (input 이벤트 — 모바일/PC 공통) ── */
 (function() {
+  function _renumberLines(text) {
+    const lines = text.split('\n');
+    let changed = false;
+    let i = 0;
+    while (i < lines.length) {
+      if (/^ {4}\d+\. /.test(lines[i])) {
+        const startNum = parseInt(lines[i].match(/^ {4}(\d+)\. /)[1]);
+        let j = i, counter = startNum;
+        while (j < lines.length && /^ {4}\d+\. /.test(lines[j])) {
+          const newLine = lines[j].replace(/^( {4})\d+(\. )/, '$1' + counter + '$2');
+          if (newLine !== lines[j]) { lines[j] = newLine; changed = true; }
+          counter++;
+          j++;
+        }
+        i = j;
+      } else {
+        i++;
+      }
+    }
+    return changed ? lines.join('\n') : text;
+  }
+
   let _prevVal = '';
   document.addEventListener('input', function(e) {
     const el = e.target;
@@ -663,10 +685,16 @@ document.addEventListener('input', e => {
     const lineStart = val.lastIndexOf('\n', pos - 1) + 1;
     const lineText  = val.substring(lineStart, pos);
 
-    // 1. "숫자. " 입력 감지 → 들여쓰기 + 번호 변환
+    // 1. "숫자. " 입력 감지 → 들여쓰기 + 번호 변환 (이전 번호줄 기준, 빈 줄 건너뜀)
     const triggerMatch = lineText.match(/^(\d+)\. $/);
     if (triggerMatch) {
-      const num = parseInt(triggerMatch[1]);
+      const prevLines = val.substring(0, lineStart).split('\n');
+      let prevMatch = null;
+      for (let k = prevLines.length - 1; k >= 0; k--) {
+        const m = prevLines[k].match(/^ {4}(\d+)\. /);
+        if (m) { prevMatch = m; break; }
+      }
+      const num = prevMatch ? parseInt(prevMatch[1]) + 1 : parseInt(triggerMatch[1]);
       const newLine = '    ' + num + '. ';
       const before = val.substring(0, lineStart);
       const after  = val.substring(pos);
@@ -679,7 +707,17 @@ document.addEventListener('input', e => {
     // 2. 줄바꿈 감지 → 번호 줄 다음에 다음 번호 삽입
     const prevVal = _prevVal;
     _prevVal = val;
-    if (val.length <= prevVal.length) return; // 삭제면 무시
+    if (val.length <= prevVal.length) {
+      // 삭제 시 번호 재정렬
+      const renum = _renumberLines(val);
+      if (renum !== val) {
+        const s = el.selectionStart;
+        el.value = renum;
+        _prevVal = renum;
+        el.selectionStart = el.selectionEnd = s;
+      }
+      return;
+    }
     const added = val.substring(prevVal.length);
     if (!added.includes('\n')) return;
 
