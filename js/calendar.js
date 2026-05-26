@@ -194,6 +194,11 @@ function selectDate(dateStr) {
     });
     updateSelectedDateLabel();
   }
+  // 날짜 클릭 시 할일 목록 스크롤을 최상단으로 리셋 (모바일/PC 공통)
+  // ※ selectDate 안에서만 리셋 → 체크/스와이프/모달저장/Realtime 동기화 등으로
+  //   loadTodos가 호출될 때는 사용자의 스크롤 위치가 그대로 유지됨
+  const listSection = document.getElementById('todo-list-section');
+  if (listSection) listSection.scrollTop = 0;
   loadTodos();
 }
 
