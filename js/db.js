@@ -165,11 +165,36 @@ async function fetchPastUndoneDatesForMonth(year, month) {
 async function searchTodos(keyword) {
   const all = await idbGetAll();
   const kw = keyword.toLowerCase();
+
+  // 예외 행(repeat_exception=true)이 존재하는 반복 마스터 ID 세트
+  // → 해당 마스터는 검색 결과에서 제외하고 예외 행만 표시
+  const mastersWithException = new Set(
+    all
+      .filter(t => t.repeat_exception === true)
+      .map(t => String(t.repeat_master_id))
+  );
+
   return all
-    .filter(t =>
-      (t.title || '').toLowerCase().includes(kw) ||
-      (t.memo  || '').toLowerCase().includes(kw)
-    )
+    .filter(t => {
+      // 키워드 매칭
+      const matches =
+        (t.title || '').toLowerCase().includes(kw) ||
+        (t.memo  || '').toLowerCase().includes(kw);
+      if (!matches) return false;
+
+      // repeat_deleted 항목 제외
+      if (t.repeat_deleted) return false;
+
+      // 반복 마스터 행인데 예외 행이 이미 존재하면 제외
+      // (예외 행이 완료/수정된 실제 상태를 대표하므로 마스터는 숨김)
+      const isMaster =
+        t.repeat_type && t.repeat_type !== 'none' &&
+        !t.repeat_master_id &&
+        !t.repeat_exception;
+      if (isMaster && mastersWithException.has(String(t.id))) return false;
+
+      return true;
+    })
     .sort((a, b) => {
       if (a.date !== b.date) return b.date > a.date ? 1 : -1;
       return (b.created_at || '') > (a.created_at || '') ? 1 : -1;
