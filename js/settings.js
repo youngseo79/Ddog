@@ -219,6 +219,43 @@ async function openStatsModal() {
   box.querySelector('#stats-close').addEventListener('click', () => overlay.remove());
 }
 
+// ── 습관 트래커 (PC 전용 중앙 팝업) ──
+// 통계 모달과 동일하게 history는 건드리지 않음.
+// 독립 파일 js/habits.html을 iframe으로 로드 → 코드 편입 없이 그대로 표시.
+// 뒤로가기 처리는 app.js의 hasOpenPopup/closeTopPopup이 담당(모달만 닫힘).
+function openHabitsModal() {
+  if (document.getElementById('habits-modal-overlay')) return;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'habits-modal-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;';
+
+  const box = document.createElement('div');
+  box.id = 'habits-modal-box';
+  box.style.cssText = [
+    'width:440px;max-width:92vw;height:86vh;max-height:880px;',
+    'background:var(--bg-elevated);border-radius:20px;overflow:hidden;',
+    'box-shadow:0 8px 40px rgba(0,0,0,0.5);animation:slideUp 0.25s ease;'
+  ].join('');
+
+  const frame = document.createElement('iframe');
+  frame.id = 'habits-iframe';
+  frame.src = 'js/habits.html';
+  frame.style.cssText = 'width:100%;height:100%;border:none;display:block;background:transparent;';
+
+  box.appendChild(frame);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+
+  // 바깥 클릭 시 닫기 (통계 모달과 동일)
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeHabitsModal(); });
+}
+
+function closeHabitsModal() {
+  const overlay = document.getElementById('habits-modal-overlay');
+  if (overlay) overlay.remove();
+}
+
 function initSettings() {
   document.getElementById('nav-settings').addEventListener('click', openSettingsPanel);
   document.getElementById('settings-close').addEventListener('click', closeSettingsPanel);
@@ -228,6 +265,17 @@ function initSettings() {
   if (menuTheme) menuTheme.addEventListener('click', openThemePanel);
   const menuStats = document.getElementById('menu-stats');
   if (menuStats) menuStats.addEventListener('click', () => { closeSettingsPanel(); setTimeout(openStatsModal, 350); });
+  const menuHabits = document.getElementById('menu-habits');
+  if (menuHabits) menuHabits.addEventListener('click', () => {
+    if (document.body.classList.contains('pc-layout')) {
+      // PC: 통계 모달처럼 화면 중앙 팝업(iframe)으로 표시
+      closeSettingsPanel();
+      setTimeout(openHabitsModal, 350);
+    } else {
+      // 모바일: 풀페이지 이동
+      location.href = 'js/habits.html';
+    }
+  });
   document.getElementById('repeats-back').addEventListener('click', closeRepeatsPanel);
   document.getElementById('menu-logout').addEventListener('click', openLogoutConfirm);
 }

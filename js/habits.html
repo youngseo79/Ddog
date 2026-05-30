@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>습관 트래커 · MyDaily7</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --sky1: #e3ede4; --sky2: #cfe0d3; --sky3: #8fc4a5; --sky4: #5cae7e;
+      --accent: #3a9e6a; --soft-purple: #d7e6dc;
+      --purple-mid: #3a9e6a; --purple-dark: #2d7d52;
+      --text-dark: #1e2028; --text-mid: #4a5060; --text-light: #8a8f9e;
+      --card-bg: rgba(255,255,255,0.85);
+      --shadow: 0 8px 32px rgba(58,158,106,0.13);
+      --radius: 22px; --radius-sm: 14px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+      background: linear-gradient(160deg, #f4f5f0 0%, #ebeee7 40%, #eef0ea 70%, #f4f5f0 100%);
+      min-height: 100dvh; display: flex; flex-direction: column; align-items: center; overflow-x: hidden;
+    }
+    .bg-blob { position: fixed; border-radius: 50%; filter: blur(60px); opacity: 0.35; pointer-events: none; z-index: 0; }
+    .bg-blob-1 { width: 280px; height: 280px; background: #bcdcc8; top: -60px; left: -80px; }
+    .bg-blob-2 { width: 200px; height: 200px; background: #d0e2d6; bottom: 80px; right: -60px; }
+    .bg-blob-3 { width: 150px; height: 150px; background: #e8ece4; top: 40%; left: -50px; }
+    .container {
+      position: relative; z-index: 1; width: 100%; max-width: 420px;
+      padding: 0 18px 100px; display: flex; flex-direction: column;
+    }
+    header { padding: 16px 4px 10px; animation: fadeUp 0.4s ease both; }
+    .header-top { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+    .back-btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 13px; font-weight: 600; color: #3a9e6a;
+      text-decoration: none; flex-shrink: 0; background: white; border-radius: 50px;
+      padding: 10px 16px; min-height: 42px; box-shadow: 0 2px 10px rgba(58,158,106,0.12);
+      border: none; cursor: pointer; font-family: 'Nunito', sans-serif;
+    }
+    .back-btn:active { transform: scale(0.95); }
+    .header-title-wrap { flex: 1; text-align: center; }
+    .page-title {
+      font-family: 'Nunito', sans-serif; font-size: 22px; font-weight: 900;
+      color: var(--text-dark); letter-spacing: -0.5px; text-align: center;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .page-title-icon {
+      width: 32px; height: 32px; border-radius: 9px; background: #e3ede4;
+      display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0;
+    }
+    .page-title span { color: var(--purple-mid); }
+    .page-subtitle { font-size: 13px; color: var(--text-light); margin-top: 4px; text-align: center; }
+    .view-tabs { display: flex; gap: 8px; margin-top: 10px; animation: fadeUp 0.4s 0.08s ease both; padding-bottom: 12px; }
+    .tab-btn {
+      flex: 1; padding: 10px; border: none; border-radius: 50px;
+      font-family: 'Nunito', sans-serif; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s;
+    }
+    .tab-btn.active { background: var(--purple-mid); color: white; box-shadow: 0 4px 14px rgba(58,158,106,0.35); }
+    .tab-btn:not(.active) { background: white; color: var(--text-mid); box-shadow: 0 2px 8px rgba(58,158,106,0.1); }
+    .week-nav {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-top: 18px; animation: fadeUp 0.4s 0.12s ease both;
+    }
+    .week-nav-btn {
+      width: 34px; height: 34px; border-radius: 50%; border: none; background: white;
+      box-shadow: 0 2px 8px rgba(58,158,106,0.12); font-size: 16px; cursor: pointer; color: var(--text-mid);
+      display: flex; align-items: center; justify-content: center; transition: all 0.15s;
+    }
+    .week-nav-btn:active { transform: scale(0.9); }
+    .week-label { font-family: 'Nunito', sans-serif; font-size: 14px; font-weight: 700; color: var(--text-mid); }
+    .week-days {
+      display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 14px;
+      animation: fadeUp 0.4s 0.14s ease both;
+    }
+    .day-col { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+    .day-name { font-size: 11px; font-weight: 600; color: var(--text-light); text-align: center; }
+    .day-num {
+      width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      font-family: 'Nunito', sans-serif; font-size: 13px; font-weight: 700; color: var(--text-mid);
+    }
+    .day-num.today { background: var(--purple-mid); color: white; box-shadow: 0 2px 8px rgba(58,158,106,0.4); }
+    .habits-list { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; animation: fadeUp 0.4s 0.18s ease both; }
+    .habit-row {
+      background: var(--card-bg); border-radius: var(--radius-sm); box-shadow: var(--shadow);
+      backdrop-filter: blur(12px); border: 1.5px solid rgba(255,255,255,0.7); overflow: hidden;
+    }
+    .habit-row-header { display: flex; align-items: center; gap: 10px; padding: 13px 14px 11px; }
+    .habit-icon-badge {
+      width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+      font-size: 20px; flex-shrink: 0; background: var(--soft-purple);
+    }
+    .habit-info { flex: 1; min-width: 0; }
+    .habit-name {
+      font-family: 'Nunito', sans-serif; font-size: 14px; font-weight: 800; color: var(--text-dark);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .habit-goal-label { font-size: 11px; color: var(--text-light); margin-top: 1px; }
+    .habit-progress-text { font-family: 'Nunito', sans-serif; font-size: 13px; font-weight: 700; color: var(--purple-mid); flex-shrink: 0; }
+    .habit-week-checks { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; padding: 0 14px 13px; }
+    .check-cell { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+    .check-dot {
+      width: 28px; height: 28px; border-radius: 50%; border: 2px solid #e2e5dc;
+      display: flex; align-items: center; justify-content: center; font-size: 13px; cursor: pointer;
+      transition: all 0.2s cubic-bezier(.34,1.56,.64,1); background: transparent;
+      -webkit-user-select: none; user-select: none;
+    }
+    .check-dot.done {
+      background: var(--purple-mid); border-color: var(--purple-mid);
+      box-shadow: 0 2px 8px rgba(58,158,106,0.4); color: white; font-size: 13px; font-weight: 700;
+    }
+    .check-dot.partial { border-color: var(--purple-mid); background: rgba(58,158,106,0.08); }
+    .check-dot.future { opacity: 1; cursor: default; background: #8a8f9e; border-color: #8a8f9e; }
+    .check-dot:not(.future):not(.done):active { transform: scale(0.85); }
+    .habit-prog-bar-wrap { padding: 0 14px 13px; margin-top: -4px; display: flex; align-items: center; gap: 8px; }
+    .prog-bar-bg { flex: 1; height: 5px; border-radius: 99px; background: #ebeee7; overflow: hidden; }
+    .prog-bar-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, #8fc4a5, #3a9e6a); transition: width 0.4s ease; }
+    .prog-bar-pct { font-family: 'Nunito', sans-serif; font-size: 10px; font-weight: 800; color: var(--purple-mid); width: 38px; text-align: right; flex-shrink: 0; }
+    .month-view { display: none; margin-top: 16px; }
+    .month-view.active { display: block; animation: fadeUp 0.35s ease both; }
+    .month-habit-card {
+      background: var(--card-bg); border-radius: var(--radius); box-shadow: var(--shadow);
+      backdrop-filter: blur(12px); border: 1.5px solid rgba(255,255,255,0.7); padding: 16px; margin-bottom: 14px;
+    }
+    .month-habit-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+    .month-habit-icon {
+      width: 36px; height: 36px; border-radius: 10px; background: var(--soft-purple);
+      display: flex; align-items: center; justify-content: center; font-size: 20px;
+    }
+    .month-habit-meta { flex: 1; }
+    .month-habit-name { font-family: 'Nunito', sans-serif; font-size: 14px; font-weight: 800; color: var(--text-dark); }
+    .month-habit-rate { font-size: 11px; color: var(--text-light); margin-top: 1px; }
+    .month-rate-badge { font-family: 'Nunito', sans-serif; font-size: 18px; font-weight: 900; color: var(--purple-mid); }
+    .month-dot-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+    .month-day-header { font-size: 10px; font-weight: 600; color: var(--text-light); text-align: center; padding-bottom: 4px; }
+    .add-fab {
+      position: fixed; bottom: 28px; right: calc(50% - 210px + 18px);
+      width: 56px; height: 56px; border-radius: 50%;
+      background: linear-gradient(135deg, #a9d3ba, #2d7d52); border: none; cursor: pointer;
+      box-shadow: 0 6px 20px rgba(45,125,82,0.45); display: flex; align-items: center; justify-content: center;
+      font-size: 26px; color: white; transition: transform 0.2s cubic-bezier(.34,1.56,.64,1); z-index: 100;
+    }
+    .add-fab:active { transform: scale(0.9); }
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(30,32,40,0.45); backdrop-filter: blur(6px);
+      z-index: 200; align-items: flex-end; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; animation: fadeIn 0.2s ease both; }
+    .modal-sheet {
+      width: 100%; max-width: 420px; background: linear-gradient(160deg, #eef0ea 0%, #e8ece2 100%);
+      border-radius: 28px 28px 0 0; padding: 24px 22px 40px;
+      animation: slideUp 0.3s cubic-bezier(.34,1.2,.64,1) both; max-height: 92dvh; overflow-y: auto;
+    }
+    .modal-handle { width: 40px; height: 4px; border-radius: 99px; background: #cdd0c8; margin: 0 auto 20px; }
+    .modal-title { font-family: 'Nunito', sans-serif; font-size: 20px; font-weight: 900; color: var(--text-dark); margin-bottom: 20px; }
+    .form-label {
+      font-size: 12px; font-weight: 700; color: var(--text-mid); letter-spacing: 0.06em;
+      text-transform: uppercase; margin-bottom: 8px; display: block;
+    }
+    .form-group { margin-bottom: 18px; }
+    .form-input {
+      width: 100%; padding: 12px 16px; border: 1.5px solid rgba(58,158,106,0.2); border-radius: var(--radius-sm);
+      background: white; font-size: 15px; font-family: 'Noto Sans KR', sans-serif; color: var(--text-dark); outline: none; transition: border-color 0.2s;
+    }
+    .form-input:focus { border-color: var(--purple-mid); }
+    .icon-picker-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; max-height: 220px; overflow-y: auto; padding: 4px 2px; }
+    .icon-option {
+      width: 100%; aspect-ratio: 1; border-radius: 10px; border: 2px solid transparent;
+      display: flex; align-items: center; justify-content: center; font-size: 22px; cursor: pointer;
+      background: white; transition: all 0.15s; -webkit-user-select: none; user-select: none;
+    }
+    .icon-option:active { transform: scale(0.85); }
+    .icon-option.selected { border-color: var(--purple-mid); background: var(--soft-purple); box-shadow: 0 2px 8px rgba(58,158,106,0.3); }
+    .goal-type-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .goal-type-btn {
+      padding: 10px 6px; border-radius: var(--radius-sm); border: 1.5px solid rgba(58,158,106,0.2);
+      background: white; cursor: pointer; font-size: 11px; font-weight: 700; color: var(--text-mid);
+      text-align: center; line-height: 1.4; transition: all 0.15s;
+    }
+    .goal-type-btn.selected { border-color: var(--purple-mid); background: var(--soft-purple); color: var(--purple-dark); }
+    .goal-type-btn .type-emoji { font-size: 18px; display: block; margin-bottom: 4px; }
+    .goal-num-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+    .num-input {
+      width: 80px; padding: 10px 14px; border: 1.5px solid rgba(58,158,106,0.2); border-radius: var(--radius-sm);
+      background: white; font-family: 'Nunito', sans-serif; font-size: 18px; font-weight: 800; color: var(--text-dark);
+      text-align: center; outline: none;
+    }
+    .num-input:focus { border-color: var(--purple-mid); }
+    .num-unit { font-size: 13px; color: var(--text-mid); font-weight: 600; }
+    .num-unit-input {
+      flex: 1; padding: 10px 14px; border: 1.5px solid rgba(58,158,106,0.2); border-radius: var(--radius-sm);
+      background: white; font-size: 14px; color: var(--text-dark); outline: none;
+    }
+    .num-unit-input:focus { border-color: var(--purple-mid); }
+    .save-btn {
+      width: 100%; padding: 15px; background: linear-gradient(135deg, #a9d3ba, #2d7d52); border: none;
+      border-radius: var(--radius-sm); color: white; font-family: 'Nunito', sans-serif; font-size: 16px; font-weight: 800;
+      cursor: pointer; margin-top: 8px; box-shadow: 0 4px 16px rgba(45,125,82,0.3); transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .save-btn:active { transform: scale(0.97); box-shadow: none; }
+    .empty-state { text-align: center; padding: 48px 20px; animation: fadeUp 0.4s 0.2s ease both; }
+    .empty-state .empty-icon { font-size: 52px; margin-bottom: 14px; }
+    .empty-state p { font-size: 14px; color: var(--text-light); line-height: 1.7; }
+    @keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:none; } }
+    @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+    @keyframes slideUp { from { transform:translateY(100%); } to { transform:translateY(0); } }
+    .habit-row-header .del-btn, .habit-row-header .edit-btn, .habit-row-header .drag-handle {
+      background: none; border: none; font-size: 15px; cursor: pointer; padding: 4px 5px;
+      border-radius: 8px; transition: all 0.15s; display: flex; align-items: center; justify-content: center;
+      width: 28px; height: 28px; flex-shrink: 0;
+    }
+    .habit-row-header .del-btn { color: #cdd0c8; }
+    .habit-row-header .del-btn:hover { background: #f3dde0; color: #c94050; }
+    .habit-row-header .edit-btn { color: #bdc1b8; font-size: 13px; }
+    .habit-row-header .edit-btn:hover { background: var(--soft-purple); color: var(--purple-mid); }
+    .habit-row-header .drag-handle { cursor: grab; color: #cdd0c8; flex-direction: column; gap: 3px; }
+    .habit-row-header .drag-handle:active { cursor: grabbing; color: var(--purple-mid); }
+    .drag-handle-lines { display: flex; flex-direction: column; gap: 3px; pointer-events: none; }
+    .drag-handle-lines span { display: block; width: 16px; height: 2px; border-radius: 2px; background: currentColor; }
+    .habit-row.dragging { opacity: 0.4; transform: scale(0.98); box-shadow: none; transition: none; }
+    .habit-row.drag-over { border-color: var(--purple-mid); box-shadow: 0 0 0 2px rgba(58,158,106,0.3); }
+    .month-dot {
+      width: 100%; aspect-ratio: 1; border-radius: 6px; position: relative; overflow: hidden;
+      display: flex; align-items: flex-end; justify-content: center; cursor: default; transition: all 0.15s;
+    }
+    .month-dot-label { position: relative; z-index: 2; font-size: 9px; font-weight: 700; line-height: 1; padding-bottom: 2px; color: var(--text-mid); }
+    .month-dot-fill { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(180deg, #8fc4a5, #3a9e6a); transition: height 0.3s ease; }
+    .month-dot.empty { background: transparent; cursor: default; }
+    .month-dot.future { background: #eef0ea; cursor: default; opacity: 0.45; }
+    .month-dot.miss { background: #eef0ea; }
+    .month-dot.miss .month-dot-label { color: var(--text-light); }
+    .month-dot.today-dot { box-shadow: 0 0 0 2px var(--purple-mid); }
+    .month-nav {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-top: 18px; margin-bottom: 4px; animation: fadeUp 0.35s ease both;
+    }
+    .month-nav-btn {
+      width: 34px; height: 34px; border-radius: 50%; border: none; background: white;
+      box-shadow: 0 2px 8px rgba(58,158,106,0.12); font-size: 16px; cursor: pointer; color: var(--text-mid);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .month-nav-label { font-family: 'Nunito', sans-serif; font-size: 14px; font-weight: 700; color: var(--text-mid); }
+    .sticky-header {
+      position: sticky; top: 0; z-index: 50;
+      margin: 0 -18px;
+      padding: 0 18px;
+      background: rgba(244,245,240,0.92);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      box-shadow: 0 2px 16px rgba(58,158,106,0.10);
+      border-bottom: 1.5px solid rgba(189,193,184,0.4);
+    }
+    .confirm-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(30,32,40,0.45); backdrop-filter: blur(6px);
+      z-index: 300; align-items: center; justify-content: center;
+    }
+    .confirm-overlay.open { display: flex; animation: fadeIn 0.18s ease both; }
+    .confirm-sheet {
+      width: calc(100% - 48px); max-width: 320px;
+      background: linear-gradient(160deg, #eef0ea 0%, #e8ece2 100%);
+      border-radius: 24px; padding: 28px 24px 20px;
+      animation: scaleIn 0.2s cubic-bezier(.34,1.2,.64,1) both;
+      box-shadow: 0 16px 48px rgba(58,158,106,0.18);
+    }
+    @keyframes scaleIn { from { opacity:0; transform:scale(0.92); } to { opacity:1; transform:scale(1); } }
+    .confirm-icon { font-size: 36px; text-align: center; margin-bottom: 12px; }
+    .confirm-title { font-family: 'Nunito', sans-serif; font-size: 17px; font-weight: 900; color: var(--text-dark); text-align: center; margin-bottom: 8px; }
+    .confirm-desc { font-size: 13px; color: var(--text-mid); text-align: center; line-height: 1.6; margin-bottom: 22px; }
+    .confirm-btns { display: flex; gap: 10px; }
+    .confirm-btn-cancel {
+      flex: 1; padding: 13px; border: 1.5px solid rgba(58,158,106,0.2); border-radius: var(--radius-sm);
+      background: white; font-family: 'Nunito', sans-serif; font-size: 14px; font-weight: 700;
+      color: var(--text-mid); cursor: pointer; transition: all 0.15s;
+    }
+    .confirm-btn-cancel:active { background: #eef0ea; }
+    .confirm-btn-delete {
+      flex: 1; padding: 13px; border: none; border-radius: var(--radius-sm);
+      background: linear-gradient(135deg, #d8606e, #c94050); font-family: 'Nunito', sans-serif;
+      font-size: 14px; font-weight: 800; color: white; cursor: pointer;
+      box-shadow: 0 4px 14px rgba(201,64,80,0.3); transition: all 0.15s;
+    }
+    .confirm-btn-delete:active { transform: scale(0.97); box-shadow: none; }
+    @media (max-width: 400px) { .icon-picker-grid { grid-template-columns: repeat(7, 1fr); } }
+  </style>
+</head>
+<body>
+<div class="bg-blob bg-blob-1"></div>
+<div class="bg-blob bg-blob-2"></div>
+<div class="bg-blob bg-blob-3"></div>
+
+<div class="container">
+  <div class="sticky-header">
+  <header>
+    <div class="header-top">
+      <button class="back-btn" onclick="goBackToApp()" aria-label="뒤로">‹ 뒤로</button>
+      <div class="header-title-wrap">
+        <h1 class="page-title"><div class="page-title-icon">✅</div>습관 <span>트래커</span></h1>
+      </div>
+      <span class="back-btn" aria-hidden="true" style="visibility:hidden;">‹ 뒤로</span>
+    </div>
+    <p class="page-subtitle">작은 반복이 큰 변화를 만듭니다.</p>
+  </header>
+
+  <div class="view-tabs">
+    <button class="tab-btn active" id="tab-week" onclick="switchTab('week')">📅 이번 주</button>
+    <button class="tab-btn" id="tab-month" onclick="switchTab('month')">📆 이번 달</button>
+  </div>
+  </div>
+
+  <!-- 주간 뷰 -->
+  <div id="view-week">
+    <div class="week-nav">
+      <button class="week-nav-btn" onclick="shiftWeek(-1)">‹</button>
+      <span class="week-label" id="week-label"></span>
+      <button class="week-nav-btn" onclick="shiftWeek(1)">›</button>
+    </div>
+    <div class="week-days" id="week-days-header"></div>
+    <div class="habits-list" id="week-habits-list"></div>
+  </div>
+
+  <!-- 월간 뷰 -->
+  <div id="view-month" style="display:none;">
+    <div class="month-nav">
+      <button class="month-nav-btn" onclick="shiftMonth(-1)">‹</button>
+      <span class="month-nav-label" id="month-label"></span>
+      <button class="month-nav-btn" onclick="shiftMonth(1)">›</button>
+    </div>
+    <div id="month-habits-list" class="month-view active"></div>
+  </div>
+</div>
+
+<!-- FAB -->
+<button class="add-fab" onclick="openModal()" title="습관 추가">＋</button>
+
+<!-- 삭제 확인 모달 -->
+<div class="confirm-overlay" id="confirm-modal">
+  <div class="confirm-sheet">
+    <div class="confirm-icon">🗑️</div>
+    <div class="confirm-title">습관을 삭제할까요?</div>
+    <div class="confirm-desc" id="confirm-desc">이 습관과 모든 기록이 삭제돼요.<br>삭제 후에는 복구할 수 없어요.</div>
+    <div class="confirm-btns">
+      <button class="confirm-btn-cancel" onclick="closeConfirm()">취소</button>
+      <button class="confirm-btn-delete" id="confirm-delete-btn">삭제</button>
+    </div>
+  </div>
+</div>
+
+<!-- 추가/수정 모달 -->
+<div class="modal-overlay" id="modal" onclick="handleOverlayClick(event)">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">✨ 새 습관 추가</div>
+    <div class="form-group">
+      <label class="form-label">습관 이름</label>
+      <input class="form-input" id="habit-name-input" type="text" placeholder="예: 물 2리터 마시기" maxlength="30" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">아이콘 선택</label>
+      <div class="icon-picker-grid" id="icon-picker"></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">목표 유형</label>
+      <div class="goal-type-row">
+        <button class="goal-type-btn selected" data-type="weekly" onclick="selectGoalType(this,'weekly')">
+          <span class="type-emoji">📅</span>주 N회
+        </button>
+        <button class="goal-type-btn" data-type="daily_count" onclick="selectGoalType(this,'daily_count')">
+          <span class="type-emoji">🔁</span>하루 N회
+        </button>
+        <button class="goal-type-btn" data-type="daily_amount" onclick="selectGoalType(this,'daily_amount')">
+          <span class="type-emoji">📏</span>하루 N량
+        </button>
+      </div>
+      <div class="goal-num-row">
+        <input class="num-input" id="goal-num" type="number" min="1" max="7" placeholder="" oninput="validateGoalNum()" />
+        <span class="num-unit" id="goal-unit-label">회 / 주</span>
+        <input class="num-unit-input" id="goal-unit-custom" type="text" placeholder="단위 (예: L, 분, 페이지)" style="display:none;" maxlength="10" />
+      </div>
+      <div id="daily-days-row" style="display:none; margin-top:10px;">
+        <label class="form-label" style="margin-bottom:6px;">주 며칠 실천할까요?</label>
+        <div class="goal-num-row">
+          <input class="num-input" id="goal-days-per-week" type="number" min="1" max="7" placeholder="" oninput="validateDaysPerWeek()" />
+          <span class="num-unit">일 / 주 (1~7)</span>
+        </div>
+        <div id="goal-days-error" style="display:none; color:#c94050; font-size:12px; margin-top:6px; font-weight:600;">1~7 사이 숫자만 입력 가능해요.</div>
+      </div>
+      <div id="goal-num-error" style="display:none; color:#c94050; font-size:12px; margin-top:6px; font-weight:600;">주 N회는 1~7 사이 숫자만 입력 가능해요.</div>
+    </div>
+    <button class="save-btn" onclick="saveHabit()">저장하기</button>
+  </div>
+</div>
+
+<script>
+// iframe(PC 중앙 팝업)으로 떠 있으면 embed 모드.
+// embed 모드에선 자체 history 조작을 전부 끄고(부모 앱의 뒤로가기 스택 보호),
+// 뒤로 버튼은 부모의 모달 닫기를 호출한다.
+const HT_EMBEDDED = (function(){ try { return window.self !== window.top; } catch(e) { return true; } })();
+
+// ── 일정관리 앱으로 복귀 / 모달 닫기 ──
+function goBackToApp() {
+  if (HT_EMBEDDED) {
+    // PC 중앙 팝업(iframe) 안: 부모에게 모달 닫기 요청
+    try {
+      if (window.parent && typeof window.parent.closeHabitsModal === 'function') {
+        window.parent.closeHabitsModal();
+        return;
+      }
+    } catch(e) {}
+    return;
+  }
+  // 모바일 풀페이지: 앱(index)으로 복귀
+  if (history.length > 1) history.back();
+  else location.href = '../index.html';
+}
+const LS_DEFS = 'habit_defs';
+const LS_LOGS = 'habit_logs';
+function loadDefs() { try { return JSON.parse(localStorage.getItem(LS_DEFS) || '[]'); } catch { return []; } }
+function saveDefs(arr) { localStorage.setItem(LS_DEFS, JSON.stringify(arr)); }
+function loadLogs() { try { return JSON.parse(localStorage.getItem(LS_LOGS) || '{}'); } catch { return {}; } }
+function saveLogs(obj) { localStorage.setItem(LS_LOGS, JSON.stringify(obj)); }
+function logKey(habitId, dateS) { return `${habitId}|${dateS}`; }
+function pruneOldLogs(logs) {
+  const keys = Object.keys(logs);
+  if (keys.length === 0) return logs;
+  const months = [...new Set(keys.map(k => k.split('|')[1].slice(0,7)))].sort();
+  if (months.length <= 12) return logs;
+  const oldest = months[0];
+  const pruned = {};
+  for (const k of keys) { if (!k.split('|')[1].startsWith(oldest)) pruned[k] = logs[k]; }
+  return pruned;
+}
+let habitDefs = [], habitLogs = {}, weekOffset = 0, monthOffset = 0, editingHabitId = null;
+const ICONS = [
+  '🏃','🏋️','🧘','🚴','🏊','🤸','💪','🧗','⛹️','🤾','🏌️','🏇','🥊','🤼','🏂','🎿',
+  '💧','🥤','🍎','🥗','🥩','🥦','☕','🍵','🧃','🥛','🍳','🥑','🍇','🫖','🍱','🥕',
+  '📖','📝','💻','🎯','🧠','📚','✏️','🔬','🖊️','📐','🗒️','🔭','💼','🗂️','📊','⌨️',
+  '😴','🛌','🌙','⏰','🧸','🛁','🪥','💊','🩺','🩹','🧴','🪞','🌡️','🧹','🛏️','🫧',
+  '🌿','🌸','🌻','❤️','🙏','✨','🕯️','🪷','🫶','🌬️','🧩','🎋','🪴','🌊','☁️','🫐',
+  '🎵','🎨','📷','🌱','🐾','🎸','🎭','🖌️','📸','🎬','🎹','✂️','🧶','🪆','🎲','🎻',
+  '🚶','🚗','✈️','🚲','🛴','🐶','🐱','🌍','🏠','🛒','🌅','🚌','⛵','🎒','🧳','🚿',
+  '⭐','🔥','💡','🏆','🎉','🪄','🌈','💎','🚀','🎖️','🥇','🎗️','📌','🔑','🪙','⚡'
+];
+let selectedIcon = ICONS[0], selectedGoalType = 'weekly';
+function buildIconPicker() {
+  const grid = document.getElementById('icon-picker');
+  grid.innerHTML = '';
+  ICONS.forEach(ico => {
+    const btn = document.createElement('div');
+    btn.className = 'icon-option' + (ico === selectedIcon ? ' selected' : '');
+    btn.textContent = ico;
+    btn.onclick = () => { document.querySelectorAll('.icon-option').forEach(b => b.classList.remove('selected')); btn.classList.add('selected'); selectedIcon = ico; };
+    grid.appendChild(btn);
+  });
+}
+function selectGoalType(el, type) {
+  document.querySelectorAll('.goal-type-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected'); selectedGoalType = type;
+  const numInput = document.getElementById('goal-num'), unitLabel = document.getElementById('goal-unit-label');
+  const unitCustom = document.getElementById('goal-unit-custom'), errMsg = document.getElementById('goal-num-error');
+  const dailyDaysRow = document.getElementById('daily-days-row');
+  numInput.value = ''; errMsg.style.display = 'none'; dailyDaysRow.style.display = 'none';
+  document.getElementById('goal-days-per-week').value = ''; document.getElementById('goal-days-error').style.display = 'none';
+  if (type === 'weekly') { unitLabel.textContent = '회 / 주'; unitLabel.style.display=''; unitCustom.style.display='none'; numInput.min=1; numInput.max=7; errMsg.textContent='주 N회는 1~7 사이 숫자만 입력 가능해요.'; }
+  else if (type === 'daily_count') { unitLabel.textContent = '회 / 일'; unitLabel.style.display=''; unitCustom.style.display='none'; numInput.min=1; numInput.max=99; dailyDaysRow.style.display='block'; }
+  else { unitLabel.style.display='none'; unitCustom.style.display=''; numInput.min=1; numInput.max=9999; dailyDaysRow.style.display='block'; }
+}
+function validateGoalNum() {
+  if (selectedGoalType !== 'weekly') return;
+  const val = parseInt(document.getElementById('goal-num').value);
+  document.getElementById('goal-num-error').style.display = (isNaN(val)||val<1||val>7) ? 'block' : 'none';
+}
+function validateDaysPerWeek() {
+  const val = parseInt(document.getElementById('goal-days-per-week').value);
+  document.getElementById('goal-days-error').style.display = (isNaN(val)||val<1||val>7) ? 'block' : 'none';
+}
+function openModal() {
+  editingHabitId = null;
+  document.querySelector('.modal-title').textContent = '✨ 새 습관 추가';
+  document.querySelector('.save-btn').textContent = '저장하기';
+  selectedIcon = ICONS[0]; selectedGoalType = 'weekly'; buildIconPicker();
+  document.querySelectorAll('.goal-type-btn').forEach(b => b.classList.remove('selected'));
+  document.querySelector('[data-type="weekly"]').classList.add('selected');
+  document.getElementById('habit-name-input').value = '';
+  document.getElementById('goal-num').value = ''; document.getElementById('goal-num').min=1; document.getElementById('goal-num').max=7;
+  document.getElementById('goal-unit-label').textContent = '회 / 주'; document.getElementById('goal-unit-label').style.display='';
+  document.getElementById('goal-unit-custom').style.display='none'; document.getElementById('goal-num-error').style.display='none';
+  document.getElementById('daily-days-row').style.display='none'; document.getElementById('goal-days-per-week').value='';
+  document.getElementById('goal-days-error').style.display='none';
+  document.getElementById('modal').classList.add('open');
+  if (!HT_EMBEDDED) history.pushState({modal: true}, '');
+  setTimeout(() => document.getElementById('habit-name-input').focus(), 300);
+}
+function openEditModal(habitId) {
+  const h = habitDefs.find(d => d.habit_id === habitId); if (!h) return;
+  editingHabitId = habitId;
+  document.querySelector('.modal-title').textContent = '✏️ 습관 수정';
+  document.querySelector('.save-btn').textContent = '수정 완료';
+  selectedIcon = h.icon; selectedGoalType = h.goal_type; buildIconPicker();
+  document.querySelectorAll('.goal-type-btn').forEach(b => b.classList.remove('selected'));
+  document.querySelector(`[data-type="${h.goal_type}"]`).classList.add('selected');
+  document.getElementById('habit-name-input').value = h.name;
+  const unitLabel = document.getElementById('goal-unit-label'), unitCustom = document.getElementById('goal-unit-custom');
+  const dailyDaysRow = document.getElementById('daily-days-row');
+  document.getElementById('goal-num-error').style.display='none'; document.getElementById('goal-days-error').style.display='none';
+  if (h.goal_type === 'weekly') {
+    document.getElementById('goal-num').value=h.goal_value; document.getElementById('goal-num').min=1; document.getElementById('goal-num').max=7;
+    unitLabel.textContent='회 / 주'; unitLabel.style.display=''; unitCustom.style.display='none'; dailyDaysRow.style.display='none';
+  } else if (h.goal_type === 'daily_count') {
+    document.getElementById('goal-num').value=h.goal_value; document.getElementById('goal-num').min=1; document.getElementById('goal-num').max=99;
+    unitLabel.textContent='회 / 일'; unitLabel.style.display=''; unitCustom.style.display='none';
+    dailyDaysRow.style.display='block'; document.getElementById('goal-days-per-week').value=h.days_per_week||7;
+  } else {
+    document.getElementById('goal-num').value=h.goal_value; document.getElementById('goal-num').min=1; document.getElementById('goal-num').max=9999;
+    unitLabel.style.display='none'; unitCustom.style.display=''; unitCustom.value=h.goal_unit||'';
+    dailyDaysRow.style.display='block'; document.getElementById('goal-days-per-week').value=h.days_per_week||7;
+  }
+  document.getElementById('modal').classList.add('open');
+  if (!HT_EMBEDDED) history.pushState({modal: true}, '');
+}
+function closeModal() {
+  const modal = document.getElementById('modal');
+  if (!modal.classList.contains('open')) return;
+  modal.classList.remove('open');
+  if (!HT_EMBEDDED && history.state && history.state.modal) history.back();
+}
+function handleOverlayClick(e) { if (e.target.id === 'modal') closeModal(); }
+window.addEventListener('popstate', function(e) {
+  if (HT_EMBEDDED) return;
+  const modal = document.getElementById('modal');
+  if (modal.classList.contains('open')) { modal.classList.remove('open'); return; }
+  const confirmModal = document.getElementById('confirm-modal');
+  if (confirmModal.classList.contains('open')) { confirmModal.classList.remove('open'); }
+});
+function saveHabit() {
+  const name = document.getElementById('habit-name-input').value.trim();
+  if (!name) { alert('습관 이름을 입력해주세요.'); return; }
+  const num = parseInt(document.getElementById('goal-num').value);
+  if (isNaN(num)||num<1) { alert('목표 수치를 입력해주세요.'); return; }
+  if (selectedGoalType==='weekly'&&(num<1||num>7)) { alert('주 N회는 1~7 사이 숫자만 입력 가능해요.'); return; }
+  let daysPerWeek = 7;
+  if (selectedGoalType==='daily_count'||selectedGoalType==='daily_amount') {
+    const dpw = parseInt(document.getElementById('goal-days-per-week').value);
+    if (isNaN(dpw)||dpw<1||dpw>7) { alert('주 며칠 실천할지 1~7 사이로 입력해주세요.'); return; }
+    daysPerWeek = dpw;
+  }
+  const customUnit = document.getElementById('goal-unit-custom').value.trim()||'';
+  const defs = loadDefs();
+  if (editingHabitId) {
+    const idx = defs.findIndex(d => d.habit_id===editingHabitId); if (idx<0) return;
+    defs[idx] = {...defs[idx], name, icon:selectedIcon, goal_type:selectedGoalType, goal_value:num, goal_unit:customUnit, days_per_week:daysPerWeek};
+    saveDefs(defs);
+  } else {
+    const maxOrder = defs.reduce((mx,d) => Math.max(mx,d.sort_order||0), 0);
+    defs.push({ habit_id:'h_'+Date.now(), name, icon:selectedIcon, goal_type:selectedGoalType, goal_value:num, goal_unit:customUnit, days_per_week:daysPerWeek, sort_order:maxOrder+1, created_at:new Date().toISOString() });
+    saveDefs(defs);
+  }
+  closeModal(); loadAll(); renderWeek();
+}
+function deleteHabit(habitId) {
+  const h = habitDefs.find(d => d.habit_id === habitId); if (!h) return;
+  openConfirm(h.name, () => {
+    saveDefs(loadDefs().filter(d => d.habit_id !== habitId)); loadAll(); renderWeek();
+  });
+}
+function openConfirm(habitName, onConfirm) {
+  const modal = document.getElementById('confirm-modal');
+  document.getElementById('confirm-desc').innerHTML = `<strong style="color:var(--text-dark)">${habitName}</strong> 습관과 모든 기록이 삭제돼요.<br>삭제 후에는 복구할 수 없어요.`;
+  document.getElementById('confirm-delete-btn').onclick = () => { closeConfirm(); onConfirm(); };
+  modal.classList.add('open');
+  if (!HT_EMBEDDED) history.pushState({confirmModal: true}, '');
+}
+function closeConfirm() {
+  const modal = document.getElementById('confirm-modal');
+  if (!modal.classList.contains('open')) return;
+  modal.classList.remove('open');
+  if (!HT_EMBEDDED && history.state && history.state.confirmModal) history.back();
+}
+function toggleLog(habitId, dateS) {
+  const h = habitDefs.find(d => d.habit_id===habitId); if (!h) return;
+  const k = logKey(habitId, dateS), currentVal = habitLogs[k] ? (habitLogs[k].value||1) : 0;
+  let nextVal;
+  if (h.goal_type==='daily_count') { nextVal = currentVal>=h.goal_value ? 0 : currentVal+1; }
+  else if (h.goal_type==='daily_amount') { const steps=[0,25,50,75,100]; const idx=steps.indexOf(currentVal); nextVal=steps[(idx+1)%steps.length]; }
+  else { nextVal = currentVal>=1 ? 0 : 1; }
+  const logs = loadLogs();
+  if (nextVal===0) { delete logs[k]; } else { logs[k]={value:nextVal, ts:new Date().toISOString()}; }
+  const pruned = pruneOldLogs(logs); saveLogs(pruned); habitLogs = pruned; renderWeek();
+}
+let dragState = null;
+function initDragHandles() {
+  document.getElementById('week-habits-list').addEventListener('touchstart', onDragTouchStart, {passive:false});
+  document.getElementById('week-habits-list').addEventListener('mousedown', onDragMouseDown);
+}
+function getHandle(el) { return el.closest('.drag-handle'); }
+function onDragTouchStart(e) { const handle=getHandle(e.target); if (!handle) return; e.preventDefault(); const row=handle.closest('.habit-row'); if (!row) return; startDrag(row,e.touches[0].clientY); document.addEventListener('touchmove',onDragTouchMove,{passive:false}); document.addEventListener('touchend',onDragTouchEnd,{once:true}); }
+function onDragTouchMove(e) { if (!dragState) return; e.preventDefault(); moveDrag(e.touches[0].clientY); }
+function onDragTouchEnd() { document.removeEventListener('touchmove',onDragTouchMove); endDrag(); }
+function onDragMouseDown(e) { const handle=getHandle(e.target); if (!handle) return; const row=handle.closest('.habit-row'); if (!row) return; startDrag(row,e.clientY); document.addEventListener('mousemove',onDragMouseMove); document.addEventListener('mouseup',onDragMouseUp,{once:true}); }
+function onDragMouseMove(e) { if (!dragState) return; moveDrag(e.clientY); }
+function onDragMouseUp() { document.removeEventListener('mousemove',onDragMouseMove); endDrag(); }
+function startDrag(row, clientY) {
+  row.classList.add('dragging'); const rect=row.getBoundingClientRect(); const clone=row.cloneNode(true);
+  clone.style.cssText=`position:fixed;z-index:999;pointer-events:none;width:${rect.width}px;left:${rect.left}px;top:${rect.top}px;opacity:0.85;box-shadow:0 12px 32px rgba(58,158,106,0.35);transform:scale(1.02);border-radius:14px;background:rgba(255,255,255,0.95);transition:none;`;
+  document.body.appendChild(clone); dragState={habitId:row.dataset.habitId, startY:clientY, cloneTop:rect.top, clone, origEl:row};
+}
+function moveDrag(clientY) {
+  if (!dragState) return; const dy=clientY-dragState.startY; dragState.clone.style.top=(dragState.cloneTop+dy)+'px';
+  const list=document.getElementById('week-habits-list'); const rows=[...list.querySelectorAll('.habit-row:not(.dragging)')];
+  let overRow=null; for (const r of rows) { const rect=r.getBoundingClientRect(); if (clientY>=rect.top&&clientY<=rect.bottom) { overRow=r; break; } }
+  rows.forEach(r => r.classList.remove('drag-over')); if (overRow) overRow.classList.add('drag-over');
+}
+function endDrag() {
+  if (!dragState) return; const {habitId,clone,origEl}=dragState; clone.remove(); origEl.classList.remove('dragging');
+  const list=document.getElementById('week-habits-list'); const overRow=list.querySelector('.habit-row.drag-over');
+  if (overRow) { overRow.classList.remove('drag-over'); const targetId=overRow.dataset.habitId; if (targetId&&targetId!==habitId) swapHabits(habitId,targetId); }
+  dragState=null;
+}
+function swapHabits(idA, idB) {
+  const defs=loadDefs(); const a=defs.find(d=>d.habit_id===idA); const b=defs.find(d=>d.habit_id===idB); if (!a||!b) return;
+  const aOrder=a.sort_order??0, bOrder=b.sort_order??0; a.sort_order=bOrder; b.sort_order=aOrder;
+  saveDefs(defs); loadAll(); renderWeek();
+}
+function todayStr() { const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+function pad(n) { return String(n).padStart(2,'0'); }
+function dateStr(d) { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+function addDays(d, n) { const r=new Date(d); r.setDate(r.getDate()+n); return r; }
+const DAY_NAMES = ['일','월','화','수','목','금','토'];
+function getWeekDates(offset=0) {
+  const today=new Date(); today.setHours(0,0,0,0); const dow=today.getDay();
+  const monday=addDays(today,-dow+(dow===0?-6:1)+offset*7);
+  return Array.from({length:7},(_,i)=>addDays(monday,i));
+}
+function loadAll() { habitDefs=loadDefs().sort((a,b)=>(a.sort_order??999)-(b.sort_order??999)); habitLogs=loadLogs(); }
+function shiftWeek(dir) { if (dir>0&&weekOffset>=0) return; weekOffset+=dir; renderWeek(); }
+function shiftMonth(dir) { monthOffset+=dir; renderMonth(); }
+function renderWeek() {
+  const dates=getWeekDates(weekOffset); const today=new Date(); today.setHours(0,0,0,0);
+  const fmt=d=>`${d.getMonth()+1}/${d.getDate()}`;
+  document.getElementById('week-label').textContent=`${fmt(dates[0])} – ${fmt(dates[6])}`;
+  const nextBtn=document.querySelector('.week-nav-btn:last-child');
+  if (nextBtn) { nextBtn.style.opacity=weekOffset>=0?'0.25':'1'; nextBtn.style.pointerEvents=weekOffset>=0?'none':''; }
+  const hdr=document.getElementById('week-days-header');
+  hdr.innerHTML=dates.map(d=>{ const isToday=dateStr(d)===dateStr(today); return `<div class="day-col"><div class="day-name">${DAY_NAMES[d.getDay()]}</div><div class="day-num${isToday?' today':''}">${d.getDate()}</div></div>`; }).join('');
+  const list=document.getElementById('week-habits-list');
+  if (habitDefs.length===0) { list.innerHTML=`<div class="empty-state"><div class="empty-icon">✅</div><p>아직 등록된 습관이 없어요.<br>아래 <strong>＋</strong> 버튼으로 추가해보세요!</p></div>`; return; }
+  list.innerHTML=habitDefs.map(h => {
+    let doneCount=0;
+    if (h.goal_type==='daily_count') { dates.forEach(d=>{ const v=(habitLogs[logKey(h.habit_id,dateStr(d))]||{}).value||0; doneCount+=v; }); }
+    else if (h.goal_type==='daily_amount') { dates.forEach(d=>{ const v=(habitLogs[logKey(h.habit_id,dateStr(d))]||{}).value||0; doneCount+=Math.min(100,v)/100; }); }
+    else { doneCount=dates.filter(d=>habitLogs[logKey(h.habit_id,dateStr(d))]).length; }
+    const target=goalWeeklyTarget(h);
+    const checks=dates.map(d=>{
+      const ds=dateStr(d), isFuture=d>today, val=(habitLogs[logKey(h.habit_id,ds)]||{}).value||0;
+      let dotContent='', dotCls='check-dot';
+      if (isFuture) { dotCls+=' future'; }
+      else if (h.goal_type==='daily_count') { const cpd=h.goal_value; if (val===0){} else if (val>=cpd){dotCls+=' done';dotContent='✓';} else {dotCls+=' partial';dotContent=`<span style="font-size:9px;font-weight:800;color:var(--purple-mid)">${val}/${cpd}</span>`;} }
+      else if (h.goal_type==='daily_amount') { if (val===0){} else if (val>=100){dotCls+=' done';dotContent='✓';} else {dotCls+=' partial';dotContent=`<svg width="28" height="28" viewBox="0 0 28 28" style="position:absolute;top:0;left:0;pointer-events:none"><circle cx="14" cy="14" r="11" fill="none" stroke="#d7e6dc" stroke-width="2.5"/><circle cx="14" cy="14" r="11" fill="none" stroke="var(--purple-mid)" stroke-width="2.5" stroke-dasharray="${2*Math.PI*11}" stroke-dashoffset="${2*Math.PI*11*(1-val/100)}" stroke-linecap="round" transform="rotate(-90 14 14)"/></svg><span style="font-size:9px;font-weight:800;color:var(--purple-mid);position:relative">${val}%</span>`;} }
+      else { if (val>=1){dotCls+=' done';dotContent='✓';} }
+      const click=!isFuture?`onclick="toggleLog('${h.habit_id}','${ds}')"`:'';
+      return `<div class="check-cell"><div class="${dotCls}" ${click} style="position:relative;display:flex;align-items:center;justify-content:center">${dotContent}</div></div>`;
+    }).join('');
+    const pctRaw=Math.min(100,doneCount/target*100);
+    const pctStr=(pctRaw*10)%10===0?Math.round(pctRaw)+'%':pctRaw.toFixed(1)+'%';
+    return `<div class="habit-row" id="row-${h.habit_id}" data-habit-id="${h.habit_id}">
+      <div class="habit-row-header">
+        <div class="drag-handle" data-habit-id="${h.habit_id}" title="꾹 누르고 드래그"><div class="drag-handle-lines"><span></span><span></span><span></span></div></div>
+        <div class="habit-icon-badge">${h.icon}</div>
+        <div class="habit-info"><div class="habit-name">${h.name}</div><div class="habit-goal-label">${goalLabel(h)}</div></div>
+        <div class="habit-progress-text">${h.goal_type==='daily_amount'?Math.round(doneCount)+'/'+target:doneCount+'/'+target}</div>
+        <button class="edit-btn" onclick="openEditModal('${h.habit_id}')" title="수정">✏️</button>
+        <button class="del-btn" onclick="deleteHabit('${h.habit_id}')" title="삭제">🗑️</button>
+      </div>
+      <div class="habit-week-checks">${checks}</div>
+      <div class="habit-prog-bar-wrap"><div class="prog-bar-bg"><div class="prog-bar-fill" style="width:${pctRaw}%"></div></div><div class="prog-bar-pct">${pctStr}</div></div>
+    </div>`;
+  }).join('');
+}
+function goalWeeklyTarget(h) { const dpw=h.days_per_week||7; if (h.goal_type==='weekly') return h.goal_value; if (h.goal_type==='daily_count') return dpw*h.goal_value; if (h.goal_type==='daily_amount') return dpw; return 7; }
+function goalLabel(h) { const dpw=h.days_per_week||7; if (h.goal_type==='weekly') return `주 ${h.goal_value}회`; if (h.goal_type==='daily_count') return `하루 ${h.goal_value}회 · 주 ${dpw}일`; return `하루 ${h.goal_value}${h.goal_unit||''} · 주 ${dpw}일`; }
+function dayAchievePct(h, ds) { const val=(habitLogs[logKey(h.habit_id,ds)]||{}).value||0; if (h.goal_type==='weekly') return val>=1?100:0; if (h.goal_type==='daily_count') return val===0?0:Math.min(100,Math.round(val/h.goal_value*100)); if (h.goal_type==='daily_amount') return val; return 0; }
+function toStep10(pct) { return Math.round(pct/10)*10; }
+function renderMonth() {
+  const today=new Date(); today.setHours(0,0,0,0); const base=new Date(today.getFullYear(),today.getMonth()+monthOffset,1);
+  const y=base.getFullYear(), m=base.getMonth(), daysInMonth=new Date(y,m+1,0).getDate(), firstDow=new Date(y,m,1).getDay();
+  document.getElementById('month-label').textContent=`${y}년 ${m+1}월`;
+  const list=document.getElementById('month-habits-list');
+  if (habitDefs.length===0) { list.innerHTML=`<div class="empty-state"><div class="empty-icon">📆</div><p>등록된 습관이 없어요.</p></div>`; return; }
+  const dayHeaders=DAY_NAMES.map(n=>`<div class="month-day-header">${n}</div>`).join('');
+  const blanks=Array.from({length:firstDow},()=>`<div class="month-dot empty"></div>`).join('');
+  list.innerHTML=habitDefs.map(h=>{
+    let totalPctSum=0, totalDays=0;
+    const dayCells=Array.from({length:daysInMonth},(_,i)=>{
+      const day=i+1, d=new Date(y,m,day); d.setHours(0,0,0,0); const ds=dateStr(d);
+      const isFuture=d>today, isToday=ds===dateStr(today);
+      if (!isFuture) { totalDays++; totalPctSum+=dayAchievePct(h,ds); }
+      if (isFuture) return `<div class="month-dot future"><div class="month-dot-label" style="color:var(--text-light)">${day}</div></div>`;
+      const rawPct=dayAchievePct(h,ds), stepPct=toStep10(rawPct);
+      const labelColor=stepPct>=60?'white':(stepPct>0?'var(--purple-dark)':'var(--text-light)');
+      let cls='month-dot'+(rawPct===0?' miss':'')+(isToday?' today-dot':'');
+      return `<div class="${cls}"><div class="month-dot-fill" style="height:${stepPct}%"></div><div class="month-dot-label" style="color:${labelColor}">${day}</div></div>`;
+    }).join('');
+    const overallRaw=totalDays>0?totalPctSum/(totalDays*100)*100:0;
+    const overallPct=Math.abs(overallRaw%1)<0.05?Math.round(overallRaw)+'%':overallRaw.toFixed(1)+'%';
+    return `<div class="month-habit-card"><div class="month-habit-header"><div class="month-habit-icon">${h.icon}</div><div class="month-habit-meta"><div class="month-habit-name">${h.name}</div><div class="month-habit-rate">${goalLabel(h)}</div></div><div class="month-rate-badge">${overallPct}</div></div><div class="month-dot-grid">${dayHeaders}${blanks}${dayCells}</div></div>`;
+  }).join('');
+}
+function switchTab(tab) {
+  document.getElementById('tab-week').classList.toggle('active',tab==='week');
+  document.getElementById('tab-month').classList.toggle('active',tab==='month');
+  document.getElementById('view-week').style.display=tab==='week'?'':'none';
+  document.getElementById('view-month').style.display=tab==='month'?'':'none';
+  if (tab==='month') renderMonth();
+  window.scrollTo({top:0, behavior:'instant'});
+}
+loadAll(); renderWeek(); initDragHandles();
+</script>
+</body>
+</html>
