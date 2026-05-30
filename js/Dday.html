@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="디데이">
+<title>디데이</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+:root {
+  --sky: #f4f5f0; --white: #ffffff;
+  --text: #1e2028; --text-muted: #4a5060; --text-light: #8a8f9e;
+  --border: #cdd0c8; --border-mid: #bdc1b8;
+  --radius: 12px; --radius-sm: 8px;
+  --shadow-sm: 0 1px 4px rgba(30,32,40,0.08);
+  --accent-light: #e3ede4; --accent-mid: #3a9e6a; --accent-btn: #2d7d52;
+  --header-bg: #ebeee7;
+}
+html, body { height: 100%; overflow: hidden; background: var(--sky); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: var(--text); }
+#app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; max-width: 480px; margin: 0 auto; background: var(--sky); }
+
+.app-header {
+  height: 58px; display: flex; align-items: center; justify-content: space-between;
+  flex-shrink: 0; background: var(--header-bg);
+  border-bottom: 1.5px solid rgba(30,32,40,0.13);
+  padding: 0 10px 0 18px; box-shadow: 0 2px 8px rgba(30,32,40,0.07);
+}
+.header-left { display: flex; align-items: center; gap: 8px; }
+.dd-back-btn {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: transparent; border: none; color: var(--text);
+  font-size: 30px; line-height: 1; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  margin-left: -6px; padding: 0 0 3px 0; flex-shrink: 0;
+}
+.dd-back-btn:active { background: var(--accent-light); }
+.app-title { font-size: 22px; font-weight: 800; color: var(--text); letter-spacing: -0.3px; }
+.header-icon { font-size: 26px; line-height: 1; }
+.header-right { display: flex; align-items: center; gap: 6px; }
+.add-btn {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--accent-mid); color: white; border: none; font-size: 24px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 6px rgba(58,158,106,0.3);
+}
+.gear-btn {
+  width: 38px; height: 38px; border-radius: 50%;
+  background: transparent; border: none; font-size: 22px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+
+.gear-dropdown {
+  position: fixed; top: 62px; right: 10px;
+  background: var(--white); border-radius: var(--radius);
+  border: 1px solid var(--border-mid); box-shadow: 0 6px 24px rgba(30,32,40,0.18);
+  z-index: 300; min-width: 150px; overflow: hidden;
+}
+.gear-dropdown.hidden { display: none; }
+.gear-menu-item {
+  display: flex; align-items: center; gap: 10px; padding: 14px 18px;
+  font-size: 14px; font-weight: 500; color: var(--text);
+  cursor: pointer; border: none; background: transparent; width: 100%; text-align: left;
+}
+.gear-menu-item:not(:last-child) { border-bottom: 1px solid var(--border); }
+.gear-menu-item:active { background: var(--accent-light); }
+.dropdown-backdrop { position: fixed; inset: 0; z-index: 299; background: transparent; }
+.dropdown-backdrop.hidden { display: none; }
+
+.tab-content { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+.panel { padding: 0 12px 20px; }
+.panel-hd { padding: 8px 0 6px; }
+
+.item-list { display: flex; flex-direction: column; gap: 8px; }
+.item-card { background: var(--white); border-radius: var(--radius); border: 1px solid var(--border); padding: 10px; display: flex; align-items: center; gap: 8px; box-shadow: var(--shadow-sm); }
+.item-body { flex: 1; min-width: 0; }
+.item-name { font-size: 14px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.item-actions { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+.edit-btn { width: 28px; height: 28px; border-radius: var(--radius-sm); border: 1px solid var(--border-mid); background: transparent; color: var(--text-muted); font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.del-btn { width: 28px; height: 28px; border-radius: var(--radius-sm); border: 1px solid #f0c4c9; background: transparent; color: #a8323f; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.dday-badge { font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 20px; background: var(--accent-light); color: var(--accent-btn); flex-shrink: 0; min-width: 56px; text-align: center; }
+.dday-past { background: #e3ede4; color: #2d7d52; }
+.dday-today { background: #e3ede4; color: #2d7d52; }
+.empty-msg { text-align: center; padding: 32px 0; color: var(--text-light); font-size: 13px; }
+
+/* 모달 공통 */
+.modal-overlay { position: fixed; inset: 0; background: rgba(30,32,40,0.45); z-index: 100; display: flex; align-items: flex-end; justify-content: center; }
+.modal-overlay.hidden { display: none; }
+.modal-box { background: var(--white); border-radius: 20px 20px 0 0; width: 100%; max-width: 480px; padding: 20px 20px 36px; max-height: 85vh; overflow-y: auto; }
+.modal-title { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 16px; }
+.form-group { margin-bottom: 14px; }
+.form-label { font-size: 13px; font-weight: 500; color: var(--text-muted); margin-bottom: 6px; display: block; }
+.form-input { width: 100%; padding: 10px 12px; border-radius: var(--radius-sm); border: 1.5px solid var(--border-mid); background: var(--accent-light); font-size: 14px; color: var(--text); outline: none; font-family: inherit; }
+.form-input:focus { border-color: var(--accent-mid); }
+.date-row { display: flex; gap: 6px; align-items: center; }
+.date-row .form-input { text-align: center; }
+.date-sep { color: var(--text-muted); font-weight: 600; font-size: 15px; flex-shrink: 0; }
+.modal-acts { display: flex; gap: 8px; margin-top: 18px; }
+.btn-cancel { flex: 1; padding: 13px; border-radius: var(--radius-sm); border: 1.5px solid var(--border-mid); background: transparent; color: var(--text-muted); font-size: 14px; font-weight: 600; cursor: pointer; }
+.btn-save { flex: 2; padding: 13px; border-radius: var(--radius-sm); border: none; background: var(--accent-btn); color: white; font-size: 14px; font-weight: 600; cursor: pointer; }
+
+/* 삭제 확인 모달 */
+.confirm-overlay { position: fixed; inset: 0; background: rgba(30,32,40,0.52); z-index: 400; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.confirm-overlay.hidden { display: none; }
+.confirm-box { background: var(--white); border-radius: 18px; width: 100%; max-width: 320px; padding: 28px 24px 22px; box-shadow: 0 8px 40px rgba(30,32,40,0.22); }
+.confirm-icon { font-size: 36px; text-align: center; margin-bottom: 12px; }
+.confirm-title { font-size: 16px; font-weight: 700; color: var(--text); text-align: center; margin-bottom: 6px; }
+.confirm-desc { font-size: 13px; color: var(--text-muted); text-align: center; margin-bottom: 22px; line-height: 1.5; }
+.confirm-acts { display: flex; gap: 8px; }
+.btn-confirm-cancel { flex: 1; padding: 12px; border-radius: var(--radius-sm); border: 1.5px solid var(--border-mid); background: transparent; color: var(--text-muted); font-size: 14px; font-weight: 600; cursor: pointer; }
+.btn-confirm-del { flex: 1.4; padding: 12px; border-radius: var(--radius-sm); border: none; background: #c94050; color: white; font-size: 14px; font-weight: 700; cursor: pointer; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="app-header">
+    <div class="header-left">
+      <button class="dd-back-btn" id="dd-back" onclick="goBackToApp()" aria-label="뒤로">‹</button>
+      <span class="header-icon">⏳</span>
+      <span class="app-title">디데이</span>
+    </div>
+    <div class="header-right">
+      <button class="add-btn" id="add-dd">+</button>
+      <button class="gear-btn" id="gear-btn">⚙️</button>
+    </div>
+  </div>
+  <div class="tab-content">
+    <div class="panel">
+      <div class="panel-hd"></div>
+      <div class="item-list" id="dd-list"></div>
+    </div>
+    <input type="file" id="file-import-dd" accept=".json" style="display:none">
+  </div>
+</div>
+
+<div class="dropdown-backdrop hidden" id="dropdown-backdrop"></div>
+<div class="gear-dropdown hidden" id="gear-dropdown">
+  <button class="gear-menu-item" id="menu-import">📥 불러오기</button>
+  <button class="gear-menu-item" id="menu-export">📤 내보내기</button>
+</div>
+
+<div class="modal-overlay hidden" id="modal">
+  <div class="modal-box">
+    <div class="modal-title" id="m-title">디데이 추가</div>
+    <div class="form-group">
+      <label class="form-label">제목</label>
+      <input class="form-input" id="f-name" type="text" placeholder="제목을 입력하세요">
+    </div>
+    <div class="form-group">
+      <label class="form-label">날짜</label>
+      <div class="date-row">
+        <input class="form-input" id="f-y" type="number" placeholder="년" min="1900" max="2100" style="width:76px" inputmode="numeric">
+        <span class="date-sep">년</span>
+        <input class="form-input" id="f-mo" type="number" placeholder="월" min="1" max="12" style="width:56px" inputmode="numeric">
+        <span class="date-sep">월</span>
+        <input class="form-input" id="f-d" type="number" placeholder="일" min="1" max="31" style="width:56px" inputmode="numeric">
+        <span class="date-sep">일</span>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">메모 <span style="color:var(--text-light);font-weight:400">(선택)</span></label>
+      <input class="form-input" id="f-memo" type="text" placeholder="간단한 메모">
+    </div>
+    <div class="modal-acts">
+      <button class="btn-cancel" id="m-cancel">취소</button>
+      <button class="btn-save" id="m-save">저장</button>
+    </div>
+  </div>
+</div>
+
+<div class="confirm-overlay hidden" id="confirm-modal">
+  <div class="confirm-box">
+    <div class="confirm-icon">🗑️</div>
+    <div class="confirm-title">삭제할까요?</div>
+    <div class="confirm-desc" id="confirm-desc"></div>
+    <div class="confirm-acts">
+      <button class="btn-confirm-cancel" id="confirm-cancel">취소</button>
+      <button class="btn-confirm-del" id="confirm-ok">삭제</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var $ = function(id){ return document.getElementById(id); };
+var FILE_SIG = 'soso_dday_v1';
+
+// iframe(PC 중앙 팝업)으로 떠 있으면 embed 모드.
+// embed 모드에선 자체 history 조작을 전부 끄고(부모 앱의 뒤로가기 스택 보호),
+// 뒤로 버튼은 부모의 모달 닫기를 호출한다. (모바일 풀페이지에선 기존 동작 그대로)
+var DD_EMBEDDED = (function(){ try { return window.self !== window.top; } catch(e) { return true; } })();
+
+// ── 일정관리 앱으로 복귀 / 모달 닫기 ──
+function goBackToApp(){
+  if (DD_EMBEDDED) {
+    try {
+      if (window.parent && typeof window.parent.closeDdayModal === 'function') {
+        window.parent.closeDdayModal();
+        return;
+      }
+    } catch(e) {}
+    return;
+  }
+  if (history.length > 1) history.back();
+  else location.href = '../index.html';
+}
+
+/* ── 유틸 ── */
+function today0(){ var d=new Date(); d.setHours(0,0,0,0); return d; }
+function dayDiff(ds){ return Math.round((new Date(ds+'T00:00:00')-today0())/86400000); }
+
+/* ── 데이터 ── */
+var S = { dd: [] };
+function load(){ try{ S.dd=JSON.parse(localStorage.getItem('ss_dd')||'[]'); }catch(e){ S.dd=[]; } }
+function save(){ localStorage.setItem('ss_dd',JSON.stringify(S.dd)); }
+
+/* ══════════════════════════════════════════════════
+   뒤로가기 처리 전략
+   - 레이어(gear / modal / confirm)를 열 때 history.pushState
+   - popstate 이벤트에서 현재 열린 레이어를 닫음
+   - 버튼·배경 클릭 시에도 history.back() 호출 → popstate 경유
+   - 중복 push 방지: 이미 레이어가 열려 있으면 추가 push 안 함
+   ══════════════════════════════════════════════════ */
+
+var currentLayer = null; // 'gear' | 'modal' | 'confirm' | null
+
+function layerOpen(name){
+  currentLayer = name;
+  if (!DD_EMBEDDED) history.pushState({ dday: name }, '');
+}
+
+function layerCloseUI(name){
+  if(name === 'gear'){
+    $('gear-dropdown').classList.add('hidden');
+    $('dropdown-backdrop').classList.add('hidden');
+  } else if(name === 'modal'){
+    $('modal').classList.add('hidden');
+  } else if(name === 'confirm'){
+    $('confirm-modal').classList.add('hidden');
+    pendingDeleteId = null;
+  }
+  currentLayer = null;
+}
+
+/* popstate 가 발화할 때만 UI를 닫는다 */
+window.addEventListener('popstate', function(e){
+  if (DD_EMBEDDED) return;
+  /* e.state.dday 가 있으면 → 레이어 히스토리 엔트리가 pop된 것 */
+  if(e.state && e.state.dday){
+    layerCloseUI(e.state.dday);
+  } else if(currentLayer){
+    /* 혹시 state가 없어도 열린 레이어가 있으면 닫기 */
+    layerCloseUI(currentLayer);
+  }
+  /* state도 없고 currentLayer도 없으면 → 정상 뒤로가기 */
+});
+
+/* 모든 닫기 요청은 history.back() 한 번 → popstate 경유 */
+/* embed 모드에선 history를 안 쓰므로 UI를 직접 닫음 */
+function requestClose(){
+  if (DD_EMBEDDED) {
+    if (currentLayer) layerCloseUI(currentLayer);
+    return;
+  }
+  history.back();
+}
+
+/* ── GEAR ── */
+$('gear-btn').onclick = function(){
+  if(currentLayer) return;
+  $('gear-dropdown').classList.remove('hidden');
+  $('dropdown-backdrop').classList.remove('hidden');
+  layerOpen('gear');
+};
+$('dropdown-backdrop').onclick = function(){ requestClose(); };
+$('menu-import').onclick = function(){
+  requestClose();
+  setTimeout(function(){ $('file-import-dd').click(); }, 100);
+};
+$('menu-export').onclick = function(){
+  requestClose();
+  setTimeout(function(){ exportData(); }, 100);
+};
+
+/* ── 추가/수정 모달 ── */
+var mCtx = { item: null, idx: null };
+
+function openModal(item, idx){
+  if(currentLayer) return;
+  mCtx = { item: item, idx: idx };
+  var isE = item !== null;
+  $('m-title').textContent = isE ? '수정' : '디데이 추가';
+  $('f-name').value  = isE ? item.name : '';
+  $('f-memo').value  = isE ? (item.memo||'') : '';
+  if(isE && item.date){
+    var p = item.date.split('-');
+    $('f-y').value=+p[0]; $('f-mo').value=+p[1]; $('f-d').value=+p[2];
+  } else {
+    $('f-y').value=''; $('f-mo').value=''; $('f-d').value='';
+  }
+  $('modal').classList.remove('hidden');
+  layerOpen('modal');
+  /* 포커스 없음 */
+}
+
+$('m-cancel').onclick = function(){ requestClose(); };
+$('modal').onclick = function(e){ if(e.target===$('modal')) requestClose(); };
+$('m-save').onclick = function(){
+  var name = $('f-name').value.trim();
+  if(!name){ $('f-name').focus(); return; }
+  if(!$('f-y').value||!$('f-mo').value||!$('f-d').value){ alert('날짜를 입력해주세요'); return; }
+  var item=mCtx.item, idx=mCtx.idx;
+  var y=String($('f-y').value).padStart(4,'0');
+  var m=String($('f-mo').value).padStart(2,'0');
+  var d=String($('f-d').value).padStart(2,'0');
+  var obj={ id: item?item.id:Date.now(), name:name, memo:$('f-memo').value.trim(), date:y+'-'+m+'-'+d };
+  if(idx!==null && idx>=0) S.dd[idx]=obj; else S.dd.push(obj);
+  save(); renderDd();
+  requestClose();
+};
+
+/* ── 삭제 확인 모달 ── */
+var pendingDeleteId = null;
+
+function showConfirm(id, name){
+  if(currentLayer) return;
+  pendingDeleteId = id;
+  $('confirm-desc').innerHTML = '<b>'+name+'</b>을(를) 삭제하면<br>다시 복구할 수 없어요.';
+  $('confirm-modal').classList.remove('hidden');
+  layerOpen('confirm');
+}
+$('confirm-cancel').onclick = function(){ requestClose(); };
+$('confirm-modal').onclick  = function(e){ if(e.target===$('confirm-modal')) requestClose(); };
+$('confirm-ok').onclick = function(){
+  if(pendingDeleteId!==null){
+    S.dd=S.dd.filter(function(x){ return x.id!==pendingDeleteId; });
+    save(); renderDd();
+  }
+  requestClose();
+};
+
+/* ── 렌더 ── */
+function renderDd(){
+  var list=$('dd-list'); list.innerHTML='';
+  var sorted=S.dd.slice().sort(function(a,b){ return b.date.localeCompare(a.date); });
+  if(!sorted.length){ list.innerHTML='<div class="empty-msg">디데이를 추가해보세요</div>'; return; }
+  sorted.forEach(function(it){ list.appendChild(makeCard(it)); });
+}
+
+function ddText(it){
+  var diff=dayDiff(it.date);
+  if(diff===0) return {t:'D-DAY',c:'dday-today'};
+  if(diff<0)   return {t:'+'+Math.abs(diff)+'일',c:'dday-past'};
+  return {t:'D-'+diff,c:''};
+}
+
+function makeCard(it){
+  var card=document.createElement('div'); card.className='item-card';
+  var body=document.createElement('div'); body.className='item-body';
+  var ne=document.createElement('div'); ne.className='item-name'; ne.textContent=it.name; body.appendChild(ne);
+  if(it.memo){ var me=document.createElement('div'); me.className='item-meta'; me.textContent=it.memo; body.appendChild(me); }
+  var de=document.createElement('div'); de.className='item-meta'; de.textContent=it.date.replace(/-/g,'. ')+'.'; body.appendChild(de);
+  var acts=document.createElement('div'); acts.className='item-actions';
+  var inf=ddText(it);
+  var badge=document.createElement('span'); badge.className='dday-badge '+inf.c; badge.textContent=inf.t; acts.appendChild(badge);
+  var eb=document.createElement('button'); eb.className='edit-btn'; eb.textContent='✏️';
+  eb.onclick=(function(item){ return function(){ var oi=S.dd.findIndex(function(x){return x.id===item.id;}); openModal(item,oi); }; })(it);
+  var db=document.createElement('button'); db.className='del-btn'; db.textContent='✕';
+  db.onclick=(function(item){ return function(){ showConfirm(item.id,item.name); }; })(it);
+  acts.appendChild(eb); acts.appendChild(db);
+  card.appendChild(body); card.appendChild(acts);
+  return card;
+}
+
+/* ── 내보내기/불러오기 ── */
+function exportData(){
+  var date=new Date();
+  var ds=date.getFullYear()+String(date.getMonth()+1).padStart(2,'0')+String(date.getDate()).padStart(2,'0');
+  var payload={_sig:FILE_SIG,data:S.dd};
+  var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a'); a.href=url; a.download='soso_dday_'+ds+'.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+function importData(file){
+  if(!file) return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      var parsed=JSON.parse(e.target.result);
+      if(!parsed._sig||parsed._sig!==FILE_SIG){ alert('이 앱에서 내보낸 디데이 파일이 아니에요.\n올바른 파일을 선택해주세요.'); return; }
+      var data=parsed.data;
+      if(!Array.isArray(data)){ alert('파일 형식이 올바르지 않아요.'); return; }
+      if(confirm('디데이 '+data.length+'개를 불러올까요?\n기존 데이터는 덮어씌워져요.')){ S.dd=data; save(); renderDd(); alert('불러오기 완료!'); }
+    }catch(err){ alert('파일을 읽을 수 없어요.'); }
+  };
+  reader.readAsText(file);
+}
+
+$('add-dd').onclick = function(){ openModal(null,null); };
+$('file-import-dd').onchange = function(e){ importData(e.target.files[0]); e.target.value=''; };
+
+/* ── 초기화 ── */
+load(); renderDd();
+/* 기본 상태 설정: layer 없음. 이 상태로 popstate가 오면 뒤로가기 허용 */
+if (!DD_EMBEDDED) history.replaceState({ dday: null }, '');
+</script>
+</body>
+</html>

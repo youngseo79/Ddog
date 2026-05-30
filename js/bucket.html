@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Buckets 🎯</title>
+<link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --sky: #5cae7e;
+    --sky-light: #e3ede4;
+    --sky-deep: #3a9e6a;
+    --sky-pale: #f4f5f0;
+    --gold: #c89a3c;
+    --gold-light: #d8b94a;
+    --star: #cfa83a;
+    --white: #ffffff;
+    --text: #1e2028;
+    --text-soft: #4a5060;
+    --done-bg: #e8ece2;
+    --done-border: #a9d3ba;
+    --shadow: 0 4px 20px rgba(58,158,106,0.18);
+    --radius: 18px;
+    --radius-sm: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; background: var(--sky-light); font-family: 'Noto Sans KR', sans-serif; color: var(--text); overflow: hidden; }
+
+  /* ── App Shell ── */
+  #app { display: flex; flex-direction: column; height: 100dvh; max-width: 480px; margin: 0 auto; background: var(--sky-pale); position: relative; overflow: hidden; box-shadow: 0 0 40px rgba(58,158,106,0.3); }
+
+  /* ── Header ── */
+  .header { background: linear-gradient(135deg, var(--sky-deep) 0%, var(--sky) 100%); padding: 18px 20px 14px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  .header-title { font-family: 'Gaegu', cursive; font-size: 28px; font-weight: 700; color: #fff; letter-spacing: 1px; text-shadow: 0 2px 8px rgba(0,0,0,0.12); }
+  .bk-back-btn { background: none; border: none; color: #fff; font-size: 32px; line-height: 1; cursor: pointer; padding: 0 8px 4px 0; flex-shrink: 0; display: flex; align-items: center; }
+  .bk-back-btn:active { opacity: 0.6; }
+  .header-title span { font-size: 24px; }
+
+  /* ── Tab Bar ── */
+  .tab-bar { display: flex; background: var(--white); border-bottom: 2px solid var(--sky-light); flex-shrink: 0; }
+  .tab-btn { flex: 1; padding: 10px 4px 8px; border: none; background: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; transition: all 0.2s; }
+  .tab-btn .tab-icon { font-size: 20px; transition: transform 0.2s; }
+  .tab-btn .tab-label { font-size: 10px; color: var(--text-soft); font-weight: 500; white-space: nowrap; }
+  .tab-btn.active .tab-icon { transform: scale(1.15); }
+  .tab-btn.active .tab-label { color: var(--sky-deep); font-weight: 700; }
+  .tab-btn.active { border-bottom: 3px solid var(--sky-deep); margin-bottom: -2px; }
+
+  /* ── Content Panels ── */
+  .panels { flex: 1; overflow: hidden; position: relative; }
+  .panel { position: absolute; inset: 0; display: none; flex-direction: column; overflow: hidden; }
+  .panel.active { display: flex; }
+
+  /* ── Stats Banner ── */
+  .stats-banner { background: linear-gradient(90deg, var(--sky-deep), var(--sky)); margin: 14px 16px 0; border-radius: var(--radius); padding: 12px 18px; color: #fff; font-size: 13px; font-weight: 700; text-align: center; box-shadow: var(--shadow); flex-shrink: 0; letter-spacing: 0.3px; }
+  .stats-banner .count { font-size: 16px; }
+
+  /* ── Item List ── */
+  .list-wrap { flex: 1; overflow-y: auto; padding: 12px 16px 100px; -webkit-overflow-scrolling: touch; }
+  .list-wrap::-webkit-scrollbar { display: none; }
+
+  /* ── Item Card ── */
+  .item-card { background: var(--white); border-radius: var(--radius-sm); margin-bottom: 10px; padding: 12px 12px 12px 8px; display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 10px rgba(58,158,106,0.1); border: 1.5px solid var(--sky-light); transition: border-color 0.25s, box-shadow 0.25s, background 0.25s; position: relative; user-select: none; }
+  .item-card.done { background: var(--done-bg); border-color: var(--done-border); box-shadow: 0 2px 16px rgba(169,211,186,0.18); }
+  .item-card.done .item-text { color: var(--text-soft); }
+
+  /* drag handle */
+  .drag-handle { cursor: grab; color: #bdc1b8; padding: 6px 8px; flex-shrink: 0; font-size: 22px; touch-action: none; line-height: 1; margin-right: 4px; }
+  .drag-handle:active { cursor: grabbing; color: var(--sky-deep); }
+
+  /* check */
+  .check-btn { width: 28px; height: 28px; border-radius: 50%; border: 2.5px solid var(--sky); background: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.2s; font-size: 15px; }
+  .check-btn.checked { background: linear-gradient(135deg, var(--gold), var(--gold-light)); border-color: var(--gold); box-shadow: 0 0 10px rgba(169,211,186,0.5); }
+  .check-btn.checked::after { content: '⭐'; font-size: 13px; }
+  .check-btn:not(.checked)::after { content: ''; width: 10px; height: 10px; border-radius: 50%; background: var(--sky-light); display: block; }
+
+  .item-body { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .item-text { font-size: 14px; line-height: 1.45; word-break: break-word; }
+  .item-memo { font-size: 12px; color: var(--text-soft); line-height: 1.4; word-break: break-word; white-space: pre-wrap; }
+
+  /* actions */
+  .item-actions { display: flex; gap: 4px; flex-shrink: 0; }
+  .act-btn { width: 30px; height: 30px; border: none; background: none; cursor: pointer; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 15px; transition: background 0.15s; }
+  .act-btn:hover { background: var(--sky-light); }
+
+  /* done section */
+  .done-section-title { font-size: 11px; color: var(--gold); font-weight: 700; padding: 8px 4px 4px; letter-spacing: 1px; display: flex; align-items: center; gap: 4px; }
+  .done-section-title::before, .done-section-title::after { content: '✦'; font-size: 9px; }
+
+  /* done card special */
+  .item-card.done .star-badge { position: absolute; top: -6px; right: 8px; font-size: 16px; animation: floatStar 2s ease-in-out infinite; }
+  @keyframes floatStar { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
+
+  /* ── FAB ── */
+  .fab { position: absolute; bottom: 24px; right: 20px; width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, var(--sky-deep), var(--sky)); border: none; color: #fff; font-size: 28px; cursor: pointer; box-shadow: 0 6px 20px rgba(58,158,106,0.45); display: flex; align-items: center; justify-content: center; transition: transform 0.15s, box-shadow 0.15s; z-index: 10; }
+  .fab:active { transform: scale(0.92); box-shadow: 0 3px 10px rgba(58,158,106,0.3); }
+
+  /* ── Modal ── */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(30,32,40,0.45); display: flex; align-items: flex-end; justify-content: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+  .modal-box { background: var(--white); border-radius: 24px 24px 0 0; width: 100%; max-width: 480px; padding: 24px 20px 32px; transform: translateY(40px); transition: transform 0.25s cubic-bezier(0.34,1.3,0.64,1); }
+  .modal-overlay.open .modal-box { transform: translateY(0); }
+  .modal-title { font-size: 17px; font-weight: 700; color: var(--text); margin-bottom: 14px; }
+  .modal-field-label { font-size: 12px; font-weight: 700; color: var(--text-soft); margin-bottom: 6px; letter-spacing: 0.3px; }
+  .modal-input { width: 100%; border: 2px solid var(--sky-light); border-radius: var(--radius-sm); padding: 12px 14px; font-size: 15px; font-family: 'Noto Sans KR', sans-serif; outline: none; color: var(--text); background: var(--sky-pale); resize: none; display: block; }
+  .modal-input:focus { border-color: var(--sky-deep); }
+  .modal-actions { display: flex; gap: 10px; margin-top: 14px; }
+  .btn-cancel { flex: 1; padding: 12px; border: 2px solid var(--sky-light); background: none; border-radius: var(--radius-sm); font-size: 15px; cursor: pointer; color: var(--text-soft); font-weight: 600; }
+  .btn-confirm { flex: 1.5; padding: 12px; background: linear-gradient(135deg, var(--sky-deep), var(--sky)); border: none; border-radius: var(--radius-sm); font-size: 15px; cursor: pointer; color: #fff; font-weight: 700; box-shadow: 0 4px 14px rgba(58,158,106,0.35); }
+
+  /* confirm modal */
+  .confirm-box { background: var(--white); border-radius: 20px; width: calc(100% - 60px); max-width: 340px; padding: 24px 20px; text-align: center; transform: scale(0.9); transition: transform 0.2s; align-self: center; }
+  .modal-overlay.open .confirm-box { transform: scale(1); }
+  .confirm-icon { font-size: 36px; margin-bottom: 10px; }
+  .confirm-msg { font-size: 15px; color: var(--text); margin-bottom: 18px; line-height: 1.6; font-weight: 500; }
+  .confirm-actions { display: flex; gap: 10px; }
+  .btn-del { flex: 1; padding: 12px; background: linear-gradient(135deg, #c94050, #5cae7e); border: none; border-radius: var(--radius-sm); font-size: 15px; cursor: pointer; color: #fff; font-weight: 700; }
+
+  /* ── Gear Button ── */
+  .gear-btn { background: rgba(30,32,40,0.22); border: none; color: #fff; font-size: 22px; width: 38px; height: 38px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.15s; flex-shrink: 0; }
+  .gear-btn:active { background: rgba(30,32,40,0.38); }
+
+  /* ── Dragging ── */
+  .item-card.dragging { opacity: 0.4; background: var(--sky-light) !important; }
+  .item-card.drag-over { border-color: var(--sky-deep) !important; background: var(--sky-pale) !important; }
+
+  /* ── Toast ── */
+  .toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--text); color: #fff; padding: 10px 20px; border-radius: 40px; font-size: 13px; font-weight: 600; z-index: 300; opacity: 0; transition: all 0.3s; pointer-events: none; white-space: nowrap; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ── Confetti burst ── */
+  @keyframes confettiBurst { 0%{transform:scale(1)} 30%{transform:scale(1.4) rotate(10deg)} 60%{transform:scale(0.9)} 100%{transform:scale(1)} }
+  .check-btn.anim { animation: confettiBurst 0.4s ease; }
+
+  /* ── Empty state ── */
+  .empty-state { text-align: center; padding: 50px 20px; color: var(--text-soft); }
+  .empty-state .e-icon { font-size: 52px; margin-bottom: 12px; opacity: 0.6; }
+  .empty-state p { font-size: 14px; line-height: 1.7; }
+
+  input[type="file"] { display: none; }
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- HEADER -->
+  <div class="header">
+    <button class="bk-back-btn" onclick="goBackToApp()" aria-label="뒤로">‹</button>
+    <div class="header-title">🎯 Buckets</div>
+    <button class="gear-btn" onclick="openGearMenu()" title="설정">⚙️</button>
+  </div>
+
+  <!-- TAB BAR -->
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="bucket" onclick="switchTab('bucket')">
+      <span class="tab-icon">🎯</span>
+      <span class="tab-label">버킷리스트</span>
+    </button>
+    <button class="tab-btn" data-tab="this-year" onclick="switchTab('this-year')">
+      <span class="tab-icon">📅</span>
+      <span class="tab-label">올해 할일</span>
+    </button>
+  </div>
+
+  <!-- PANELS -->
+  <div class="panels">
+    <!-- BUCKET LIST -->
+    <div class="panel active" id="panel-bucket">
+      <div class="stats-banner" id="stats-bucket">총 0개의 버킷 중 0개 달성!!!</div>
+      <div class="list-wrap" id="list-bucket"></div>
+      <button class="fab" onclick="openAdd('bucket')">+</button>
+    </div>
+    <!-- THIS YEAR -->
+    <div class="panel" id="panel-this-year">
+      <div class="stats-banner" id="stats-this-year">총 0개의 할일 중 0개 달성!!!</div>
+      <div class="list-wrap" id="list-this-year"></div>
+      <button class="fab" onclick="openAdd('this-year')">+</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD/EDIT MODAL -->
+<div class="modal-overlay" id="add-modal" onclick="closeAddOnBg(event)">
+  <div class="modal-box">
+    <div class="modal-title" id="modal-title">새 항목 추가</div>
+    <div class="modal-field-label">제목 <span style="color:#c94050;">*</span></div>
+    <input class="modal-input" id="modal-input" type="text" placeholder="제목을 입력하세요..." autocomplete="off">
+    <div class="modal-field-label" style="margin-top:10px;">메모 <span style="color:var(--text-soft);font-weight:400;font-size:11px;">선택</span></div>
+    <textarea class="modal-input" id="modal-memo" placeholder="메모를 입력하세요... (선택)" rows="3"></textarea>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeAdd()">취소</button>
+      <button class="btn-confirm" onclick="confirmAdd()">저장 ✨</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM DELETE MODAL -->
+<div class="modal-overlay" id="confirm-modal" onclick="closeConfirmOnBg(event)">
+  <div class="confirm-box">
+    <div class="confirm-icon">🗑️</div>
+    <div class="confirm-msg">이 항목을 삭제할까요?<br><small style="color:var(--text-soft)">삭제하면 되돌릴 수 없어요</small></div>
+    <div class="confirm-actions">
+      <button class="btn-cancel" onclick="closeConfirm()">취소</button>
+      <button class="btn-del" onclick="confirmDelete()">삭제</button>
+    </div>
+  </div>
+</div>
+
+<!-- GEAR MENU MODAL -->
+<div class="modal-overlay" id="gear-modal" onclick="closeGearOnBg(event)">
+  <div class="confirm-box" style="padding:20px;">
+    <div class="confirm-icon">⚙️</div>
+    <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:16px;">파일 관리</div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <button class="btn-confirm" onclick="exportData()">📤 파일 내보내기</button>
+      <button class="btn-confirm" style="background:linear-gradient(135deg,#5cae7e,#3a9e6a)" onclick="triggerImport()">📥 파일 가져오기</button>
+      <button class="btn-cancel" onclick="closeGearMenu()">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- WARN MODAL -->
+<div class="modal-overlay" id="warn-modal" onclick="closeWarnOnBg(event)">
+  <div class="confirm-box">
+    <div class="confirm-icon">✏️</div>
+    <div class="confirm-msg">내용을 입력해 주세요!<br><small style="color:var(--text-soft)">빈 항목은 저장할 수 없어요</small></div>
+    <div class="confirm-actions">
+      <button class="btn-confirm" style="flex:1" onclick="closeWarn()">확인</button>
+    </div>
+  </div>
+</div>
+<input type="file" id="file-input" accept=".json" onchange="importData(event)">
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+const APP_SIG = 'BUCKETS_APP_V1';
+const STORE_KEY = 'buckets_data';
+
+// iframe(PC 중앙 팝업)으로 떠 있으면 embed 모드.
+// embed 모드에선 자체 history 조작을 전부 끄고(부모 앱의 뒤로가기 스택 보호),
+// 뒤로 버튼은 부모의 모달 닫기를 호출한다. (모바일 풀페이지에선 기존 동작 그대로)
+const BK_EMBEDDED = (function(){ try { return window.self !== window.top; } catch(e) { return true; } })();
+
+// ── 일정관리 앱으로 복귀 / 모달 닫기 ──
+function goBackToApp(){
+  if (BK_EMBEDDED) {
+    try {
+      if (window.parent && typeof window.parent.closeBucketModal === 'function') {
+        window.parent.closeBucketModal();
+        return;
+      }
+    } catch(e) {}
+    return;
+  }
+  if (history.length > 1) history.back();
+  else location.href = '../index.html';
+}
+
+// ── State ──
+let data = { bucket: [], 'this-year': [] };
+
+// ── Storage ──
+function save() {
+  localStorage.setItem(STORE_KEY, JSON.stringify(data));
+}
+function load() {
+  const raw = localStorage.getItem(STORE_KEY);
+  if (raw) {
+    try { data = JSON.parse(raw); } catch(e) {}
+  }
+  // ensure tabs
+  ['bucket','this-year'].forEach(t => { if (!data[t]) data[t] = []; });
+  renderAll();
+}
+
+// ── Tab ──
+let currentTab = 'bucket';
+function switchTab(tab) {
+  cleanupDrag();
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + tab));
+  renderList(tab);
+}
+
+// ── Render ──
+function renderAll() {
+  renderList('bucket'); renderList('this-year');
+}
+
+// ── History-based modal management ──
+// Each open modal pushes a state; popstate closes it.
+const modalStack = [];
+
+function pushModal(closeFn) {
+  if (!BK_EMBEDDED) history.pushState({ modal: true }, '');
+  modalStack.push(closeFn);
+}
+
+function popModal() {
+  if (modalStack.length > 0) {
+    const fn = modalStack.pop();
+    fn();
+  }
+}
+
+// embed 모드에서 history.back() 대신 호출할 닫기 헬퍼
+// (부모 앱의 히스토리 스택을 건드리지 않고 현재 모달만 닫음)
+function bkCloseTop() {
+  popModal();
+}
+
+window.addEventListener('popstate', (e) => {
+  if (BK_EMBEDDED) return;
+  if (modalStack.length > 0) {
+    const fn = modalStack.pop();
+    fn();
+  }
+});
+
+// ── Gear Menu ──
+function openGearMenu() {
+  document.getElementById('gear-modal').classList.add('open');
+  pushModal(_closeGearMenu);
+}
+function _closeGearMenu() {
+  document.getElementById('gear-modal').classList.remove('open');
+}
+function closeGearMenu() {
+  if (modalStack.length > 0 && document.getElementById('gear-modal').classList.contains('open')) {
+    if (BK_EMBEDDED) bkCloseTop();
+    else history.back();
+  } else {
+    _closeGearMenu();
+  }
+}
+function closeGearOnBg(e) { if (e.target.id === 'gear-modal') closeGearMenu(); }
+
+function renderList(tab) {
+  const items = data[tab] || [];
+  const container = document.getElementById('list-' + tab);
+  const stats = document.getElementById('stats-' + tab);
+  const total = items.length;
+  const done = items.filter(i => i.done).length;
+  const emoji = done === total && total > 0 ? ' 🎉' : '';
+  const label = tab === 'bucket' ? '버킷' : '할일';
+  stats.innerHTML = `총 <span class="count">${total}</span>개의 ${label} 중 <span class="count">${done}</span>개 달성!!!${emoji}`;
+
+  const pending = items.filter(i => !i.done);
+  const completed = items.filter(i => i.done);
+  let html = '';
+
+  if (pending.length === 0 && completed.length === 0) {
+    html = `<div class="empty-state"><div class="e-icon">${tab === 'bucket' ? '🌟' : '📅'}</div><p>아직 항목이 없어요!<br>+ 버튼으로 추가해보세요 ✨</p></div>`;
+  } else {
+    pending.forEach(item => { html += renderCard(item, tab, false); });
+    if (completed.length > 0) {
+      html += `<div class="done-section-title">완료한 항목</div>`;
+      completed.forEach(item => { html += renderCard(item, tab, true); });
+    }
+  }
+  container.innerHTML = html;
+  initDrag(tab);
+}
+
+function renderCard(item, tab, isDone) {
+  const star = isDone ? '<span class="star-badge">⭐</span>' : '';
+  const memo = item.memo ? `<span class="item-memo">${escHtml(item.memo)}</span>` : '';
+  return `
+  <div class="item-card${isDone ? ' done' : ''}" data-id="${item.id}" data-tab="${tab}" draggable="false">
+    ${star}
+    <span class="drag-handle" title="순서 변경">☰</span>
+    <button class="check-btn${isDone ? ' checked' : ''}" onclick="toggleDone('${tab}','${item.id}',this)" title="${isDone ? '완료 해제' : '완료'}"></button>
+    <div class="item-body">
+      <span class="item-text">${escHtml(item.text)}</span>
+      ${memo}
+    </div>
+    <div class="item-actions">
+      <button class="act-btn" onclick="openEdit('${tab}','${item.id}')" title="수정">✏️</button>
+      <button class="act-btn" onclick="openDeleteConfirm('${tab}','${item.id}')" title="삭제">🗑️</button>
+    </div>
+  </div>`;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Sound ──
+const completeSound = new Audio('effect 1.mp3');
+
+// ── Toggle Done ──
+function toggleDone(tab, id, btn) {
+  const item = data[tab].find(i => i.id === id);
+  if (!item) return;
+  item.done = !item.done;
+  if (item.done) {
+    btn.classList.add('anim');
+    setTimeout(() => btn.classList.remove('anim'), 400);
+    completeSound.currentTime = 0;
+    completeSound.play().catch(() => {});
+    showToast('⭐ 완료! 훌륭해요!');
+  }
+  save();
+  renderList(tab);
+}
+
+// ── Add/Edit Modal ──
+let addTab = null, editId = null;
+function openAdd(tab) {
+  addTab = tab; editId = null;
+  document.getElementById('modal-title').textContent = '새 항목 추가 ✨';
+  document.getElementById('modal-input').value = '';
+  document.getElementById('modal-memo').value = '';
+  document.getElementById('add-modal').classList.add('open');
+  pushModal(_closeAdd);
+  // 추가 모드: 제목에 포커스
+  setTimeout(() => document.getElementById('modal-input').focus(), 300);
+}
+function openEdit(tab, id) {
+  const item = data[tab].find(i => i.id === id);
+  if (!item) return;
+  addTab = tab; editId = id;
+  document.getElementById('modal-title').textContent = '항목 수정 ✏️';
+  document.getElementById('modal-input').value = item.text;
+  document.getElementById('modal-memo').value = item.memo || '';
+  document.getElementById('add-modal').classList.add('open');
+  pushModal(_closeAdd);
+  // 수정 모드: 포커스 없이 모달만 열림 — 사용자가 원하는 필드 클릭
+}
+function _closeAdd() {
+  document.getElementById('add-modal').classList.remove('open');
+}
+function closeAdd() {
+  if (modalStack.length > 0 && document.getElementById('add-modal').classList.contains('open')) {
+    if (BK_EMBEDDED) bkCloseTop();
+    else history.back();
+  } else {
+    _closeAdd();
+  }
+}
+function closeAddOnBg(e) { if (e.target.id === 'add-modal') closeAdd(); }
+
+function confirmAdd() {
+  const txt = document.getElementById('modal-input').value.trim();
+  const memo = document.getElementById('modal-memo').value.trim();
+  if (!txt) { openWarn(); return; }
+  if (editId) {
+    const item = data[addTab].find(i => i.id === editId);
+    if (item) { item.text = txt; item.memo = memo; showToast('수정했어요! ✅'); }
+  } else {
+    data[addTab].push({ id: Date.now().toString(), text: txt, memo: memo, done: false });
+    showToast('추가했어요! 🎉');
+  }
+  save(); renderList(addTab);
+  if (modalStack.length > 0) modalStack.pop();
+  if (!BK_EMBEDDED) history.back();
+  _closeAdd();
+}
+document.getElementById('modal-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); confirmAdd(); }
+});
+
+function openWarn() {
+  document.getElementById('warn-modal').classList.add('open');
+  pushModal(_closeWarn);
+}
+function _closeWarn() { document.getElementById('warn-modal').classList.remove('open'); }
+function closeWarn() {
+  if (modalStack.length > 0 && document.getElementById('warn-modal').classList.contains('open')) {
+    if (BK_EMBEDDED) bkCloseTop();
+    else history.back();
+  } else {
+    _closeWarn();
+  }
+}
+function closeWarnOnBg(e) { if (e.target.id === 'warn-modal') closeWarn(); }
+
+// ── Delete ──
+let delTab = null, delId = null;
+function openDeleteConfirm(tab, id) {
+  delTab = tab; delId = id;
+  document.getElementById('confirm-modal').classList.add('open');
+  pushModal(_closeConfirm);
+}
+function _closeConfirm() { document.getElementById('confirm-modal').classList.remove('open'); }
+function closeConfirm() {
+  if (modalStack.length > 0 && document.getElementById('confirm-modal').classList.contains('open')) {
+    if (BK_EMBEDDED) bkCloseTop();
+    else history.back();
+  } else {
+    _closeConfirm();
+  }
+}
+function closeConfirmOnBg(e) { if (e.target.id === 'confirm-modal') closeConfirm(); }
+function confirmDelete() {
+  data[delTab] = data[delTab].filter(i => i.id !== delId);
+  save(); renderList(delTab);
+  if (modalStack.length > 0) modalStack.pop();
+  if (!BK_EMBEDDED) history.back();
+  _closeConfirm();
+  showToast('삭제했어요 🗑️');
+}
+
+// ── Export ──
+function exportData() {
+  closeGearMenu();
+  const payload = { __sig: APP_SIG, __version: 1, __exported: new Date().toISOString(), data };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `buckets_backup_${new Date().toLocaleDateString('ko-KR').replace(/\. /g,'-').replace('.','')}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('📤 파일을 내보냈어요!');
+}
+
+// ── Import ──
+function triggerImport() { closeGearMenu(); document.getElementById('file-input').click(); }
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const parsed = JSON.parse(e.target.result);
+      if (!parsed.__sig || parsed.__sig !== APP_SIG) {
+        alert('⚠️ 형식이 다릅니다!\n\nBuckets 앱에서 내보낸 파일이 아니에요.\n올바른 파일을 선택해 주세요 🙏');
+        return;
+      }
+      if (!parsed.data) throw new Error('no data');
+      data = parsed.data;
+      // ensure all tabs exist
+      ['bucket','this-year'].forEach(t => { if (!data[t]) data[t] = []; });
+      save(); renderAll();
+      showToast('📥 가져오기 완료! ✅');
+    } catch(err) {
+      if (err.message !== '⚠️') alert('⚠️ 형식이 다릅니다!\n\nBuckets 앱에서 내보낸 파일이 아니에요.');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+// ── Drag & Drop ──
+let drag = null;
+
+function cleanupDrag() {
+  // 혹시 남아있는 ghost 전부 제거
+  document.querySelectorAll('.drag-ghost').forEach(el => el.remove());
+  // 카드 스타일 복원
+  document.querySelectorAll('.item-card').forEach(c => {
+    c.style.opacity = '';
+    c.style.background = '';
+    c.classList.remove('drag-over');
+  });
+  drag = null;
+}
+
+function getCY(e) {
+  if (e.touches && e.touches.length) return e.touches[0].clientY;
+  if (e.changedTouches && e.changedTouches.length) return e.changedTouches[0].clientY;
+  return e.clientY;
+}
+
+function initDrag(tab) {
+  const container = document.getElementById('list-' + tab);
+  container.querySelectorAll('.drag-handle').forEach(handle => {
+    handle.addEventListener('mousedown', onHandleDown);
+    handle.addEventListener('touchstart', onHandleDown, { passive: false });
+  });
+}
+
+function onHandleDown(e) {
+  e.preventDefault();
+  e.stopPropagation();
+
+  // 이전 드래그 찌꺼기 청소
+  cleanupDrag();
+
+  const handle = e.currentTarget;
+  const card = handle.closest('.item-card');
+  const tab = card.dataset.tab;
+  const rect = card.getBoundingClientRect();
+  const cy = getCY(e);
+
+  // Ghost 생성 — cloneNode 쓰지 않고 직접 스냅샷 div 생성
+  // (cloneNode는 내부 버튼 이벤트·::after 등이 함께 복제돼 레이아웃 깨짐)
+  const ghost = document.createElement('div');
+  ghost.className = 'drag-ghost';
+  ghost.style.cssText =
+    'position:fixed;left:' + rect.left + 'px;top:' + rect.top + 'px;' +
+    'width:' + rect.width + 'px;height:' + rect.height + 'px;' +
+    'z-index:9999;pointer-events:none;overflow:hidden;' +
+    'display:flex;align-items:center;gap:12px;padding:12px 12px 12px 8px;' +
+    'opacity:0.95;border-radius:10px;background:#fff;' +
+    'border:2px solid #3a9e6a;' +
+    'box-shadow:0 10px 32px rgba(58,158,106,0.45);' +
+    'transform:scale(1.02) rotate(0.6deg);' +
+    'font-family:inherit;font-size:14px;color:#1e2028;';
+  // 핸들 아이콘
+  const hIcon = document.createElement('span');
+  hIcon.textContent = '☰';
+  hIcon.style.cssText = 'color:#bdc1b8;font-size:22px;flex-shrink:0;';
+  ghost.appendChild(hIcon);
+  // 체크 원
+  const chk = document.createElement('span');
+  chk.style.cssText = 'width:28px;height:28px;border-radius:50%;border:2.5px solid #5cae7e;flex-shrink:0;';
+  ghost.appendChild(chk);
+  // 텍스트
+  const txt = document.createElement('span');
+  txt.style.cssText = 'flex:1;font-size:14px;line-height:1.45;word-break:break-word;';
+  txt.textContent = card.querySelector('.item-text').textContent;
+  ghost.appendChild(txt);
+  document.body.appendChild(ghost);
+
+  // 원본 카드 흐리게
+  card.style.opacity = '0.3';
+  card.style.background = '#f4f5f0';
+
+  drag = {
+    tab,
+    card,
+    ghost,
+    offsetY: cy - rect.top,
+    id: card.dataset.id
+  };
+
+  document.addEventListener('mousemove', onDragMove, { passive: false });
+  document.addEventListener('touchmove', onDragMove, { passive: false });
+  document.addEventListener('mouseup', onDragUp);
+  document.addEventListener('touchend', onDragUp);
+  document.addEventListener('touchcancel', onDragUp);
+}
+
+function onDragMove(e) {
+  if (!drag) return;
+  e.preventDefault();
+  const cy = getCY(e);
+  drag.ghost.style.top = (cy - drag.offsetY) + 'px';
+
+  // 드롭 위치 표시
+  const container = document.getElementById('list-' + drag.tab);
+  const cards = [...container.querySelectorAll('.item-card')];
+  cards.forEach(c => c.classList.remove('drag-over'));
+  for (const c of cards) {
+    if (c === drag.card) continue;
+    const r = c.getBoundingClientRect();
+    if (cy >= r.top && cy <= r.bottom) {
+      c.classList.add('drag-over');
+      break;
+    }
+  }
+}
+
+function onDragUp(e) {
+  document.removeEventListener('mousemove', onDragMove);
+  document.removeEventListener('touchmove', onDragMove);
+  document.removeEventListener('mouseup', onDragUp);
+  document.removeEventListener('touchend', onDragUp);
+  document.removeEventListener('touchcancel', onDragUp);
+
+  if (!drag) return;
+
+  const cy = getCY(e);
+  const { tab, card, ghost, id } = drag;
+
+  // 먼저 drag 참조 null 처리 (renderList 재진입 방지)
+  drag = null;
+
+  // ghost 제거
+  ghost.remove();
+
+  // 카드 스타일 복원
+  card.style.opacity = '';
+  card.style.background = '';
+
+  // drag-over 표시 제거
+  const container = document.getElementById('list-' + tab);
+  container.querySelectorAll('.item-card').forEach(c => c.classList.remove('drag-over'));
+
+  // 드롭 위치 계산 (현재 DOM 기준)
+  const cards = [...container.querySelectorAll('.item-card')].filter(c => c !== card);
+  let insertBeforeId = null;
+  for (const c of cards) {
+    const r = c.getBoundingClientRect();
+    if (cy < r.top + r.height / 2) {
+      insertBeforeId = c.dataset.id;
+      break;
+    }
+  }
+
+  // data 배열 재정렬
+  const items = data[tab];
+  const fromIdx = items.findIndex(it => it.id === id);
+  if (fromIdx === -1) return;
+  const [moved] = items.splice(fromIdx, 1);
+
+  if (insertBeforeId === null) {
+    items.push(moved);
+  } else {
+    const toIdx = items.findIndex(it => it.id === insertBeforeId);
+    if (toIdx === -1) {
+      items.push(moved);
+    } else {
+      items.splice(toIdx, 0, moved);
+    }
+  }
+
+  save();
+  renderList(tab);
+}
+
+// ── Toast ──
+let toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+// ── Init ──
+load();
+</script>
+</body>
+</html>
