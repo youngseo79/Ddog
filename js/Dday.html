@@ -25,17 +25,22 @@ html, body { height: 100%; overflow: hidden; background: var(--sky); font-family
   height: 58px; display: flex; align-items: center; justify-content: space-between;
   flex-shrink: 0; background: var(--header-bg);
   border-bottom: 1.5px solid rgba(30,32,40,0.13);
-  padding: 0 10px 0 18px; box-shadow: 0 2px 8px rgba(30,32,40,0.07);
+  padding: 0 10px 0 10px; box-shadow: 0 2px 8px rgba(30,32,40,0.07);
+  position: relative;
+}
+.header-center {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  display: flex; align-items: center; gap: 8px; pointer-events: none;
 }
 .header-left { display: flex; align-items: center; gap: 8px; }
 .dd-back-btn {
-  width: 34px; height: 34px; border-radius: 50%;
-  background: transparent; border: none; color: var(--text);
-  font-size: 30px; line-height: 1; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  margin-left: -6px; padding: 0 0 3px 0; flex-shrink: 0;
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 13px; font-weight: 600; color: #3a9e6a;
+  flex-shrink: 0; background: white; border-radius: 50px;
+  padding: 10px 16px; min-height: 42px; box-shadow: 0 2px 10px rgba(58,158,106,0.12);
+  border: none; cursor: pointer; line-height: 1;
 }
-.dd-back-btn:active { background: var(--accent-light); }
+.dd-back-btn:active { transform: scale(0.95); }
 .app-title { font-size: 22px; font-weight: 800; color: var(--text); letter-spacing: -0.3px; }
 .header-icon { font-size: 26px; line-height: 1; }
 .header-right { display: flex; align-items: center; gap: 6px; }
@@ -117,7 +122,9 @@ html, body { height: 100%; overflow: hidden; background: var(--sky); font-family
 <div id="app">
   <div class="app-header">
     <div class="header-left">
-      <button class="dd-back-btn" id="dd-back" onclick="goBackToApp()" aria-label="뒤로">‹</button>
+      <button class="dd-back-btn" id="dd-back" onclick="goBackToApp()" aria-label="뒤로">‹ 뒤로</button>
+    </div>
+    <div class="header-center">
       <span class="header-icon">⏳</span>
       <span class="app-title">디데이</span>
     </div>

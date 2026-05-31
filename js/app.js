@@ -85,6 +85,8 @@ function initBackButton() {
 }
 
 function hasOpenPopup() {
+  // 로그아웃 확인 모달 (z-index 최상위) — 떠 있을 때만 감지
+  if (document.getElementById('logout-modal')?.style.display === 'flex') return true;
   if (document.getElementById('habits-modal-overlay')) return true;
   if (document.getElementById('dday-modal-overlay')) return true;
   if (document.getElementById('bucket-modal-overlay')) return true;
@@ -107,6 +109,14 @@ function hasOpenPopup() {
 }
 
 function closeTopPopup() {
+  // 로그아웃 확인 모달이 최상위(z-index 10000)이므로 가장 먼저 닫는다.
+  // 떠 있지 않으면(display:none) 이 분기는 통과되어 기존 동작 그대로 유지됨.
+  const logoutModal = document.getElementById('logout-modal');
+  if (logoutModal && logoutModal.style.display === 'flex') {
+    if (typeof closeLogoutConfirm === 'function') closeLogoutConfirm();
+    else logoutModal.style.display = 'none';
+    return;
+  }
   const habitsOverlay = document.getElementById('habits-modal-overlay');
   if (habitsOverlay) {
     if (typeof closeHabitsModal === 'function') closeHabitsModal();
