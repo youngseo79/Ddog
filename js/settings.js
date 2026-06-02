@@ -420,16 +420,53 @@ function closeRepeatsPanel() {
   setTimeout(() => panel.classList.add('hidden'), 300);
 }
 
+// ── 반복함 표시 판정 ──
+// 마스터가 "오늘(today) 이후로 아직 살아있는 발생분"을 하나라도 가지고 있는지 검사.
+//  · 종료일 없는 무한 반복 → 미래가 항상 존재하므로 항상 표시
+//  · 종료일이 이미 지난 반복 → 더 나올 게 없으므로 숨김
+//  · 종료일이 남아있으면 오늘~종료일 사이에 '삭제 안 된 매칭 날짜'가 있는지 스캔
+// ※ '이 날짜만 삭제'(repeat_deleted 예외 행)로 지워진 날짜는 발생분에서 제외
+function hasRemainingOccurrence(master, allRows, today) {
+  // 무한 반복: 앞으로 계속 나옴 → 항상 표시
+  if (!master.repeat_end_date) return true;
+
+  const end = master.repeat_end_date;
+  // 종료일이 오늘보다 이전 → 남은 발생분 없음 → 숨김
+  if (end < today) return false;
+
+  // 이 마스터에서 '이 날짜만 삭제' 처리된 날짜 집합
+  const deletedDates = new Set(
+    allRows
+      .filter(t => String(t.repeat_master_id) === String(master.id) && t.repeat_deleted)
+      .map(t => t.date)
+  );
+
+  // 시작일이 미래면 시작일부터, 아니면 오늘부터 종료일까지 스캔
+  const startStr = master.date > today ? master.date : today;
+  const startDate = new Date(startStr + 'T00:00:00');
+  const endDate   = new Date(end + 'T00:00:00');
+
+  for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+    const ds = toLocalDateStr(d);
+    if (isRepeatMatch(master, ds) && !deletedDates.has(ds)) return true;
+  }
+  return false;
+}
+
 async function loadRepeats() {
   const list = document.getElementById('repeats-list');
   list.innerHTML = '<div class="spinner"></div>';
   try {
     // IDB에서 읽기
     const all = await idbGetAll();
+    const today = todayStr();
     const rows = all.filter(t =>
       t.repeat_type && t.repeat_type !== 'none' &&
       !t.repeat_master_id &&
-      !t.repeat_exception
+      !t.repeat_exception &&
+      // 반복함에는 "오늘 이후로 아직 한 번이라도 더 나올" 반복만 표시
+      // → '이 날짜 이후 삭제'/종료일 만료 등으로 남은 발생분이 없으면 목록에서 제외
+      hasRemainingOccurrence(t, all, today)
     ).sort((a, b) => (b.created_at || '') > (a.created_at || '') ? 1 : -1);
 
     if (!rows.length) {

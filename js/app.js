@@ -75,10 +75,15 @@ function initBackButton() {
     if (e.state && e.state.page === 'base') {
       if (hasOpenPopup()) {
         closeTopPopup();
-        history.pushState({ page: 'app' }, '');
+        // ── 핵심 ──
+        // 이 환경에선 '뒤로가기의 결과로 호출된 pushState'가 새 항목을 쌓지 않고
+        // 현재 base 항목을 덮어써 버려, 다음 뒤로가기에서 앱을 탈출하는 버그가 있음.
+        // 새 항목을 만드는 대신, 방금 뒤로가기로 떠나온 'app' 항목이 forward 쪽에
+        // 그대로 남아있으므로 그 항목으로 도로 forward → base 바닥을 그대로 보존.
+        history.forward();
       } else if (currentTab !== 'todo') {
         switchTab('todo');
-        history.pushState({ page: 'app' }, '');
+        history.forward();
       }
     }
   });
