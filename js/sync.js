@@ -398,10 +398,20 @@ async function bgSync() {
   }
 
   // 2. 삭제된 항목 감지: Supabase id 목록과 IDB id 목록 비교
+  // 페이지네이션으로 전체 id를 가져옴 (Supabase 기본 1000개 제한 우회)
   try {
-    const sbIds = await sbFetch(`${TABLE_NAME}?select=id`);
-    if (sbIds) {
-      const sbIdSet = new Set(sbIds.map(r => r.id));
+    let allSbIds = [];
+    let offset = 0;
+    const pageSize = 1000;
+    while (true) {
+      const page = await sbFetch(`${TABLE_NAME}?select=id&limit=${pageSize}&offset=${offset}`);
+      if (!page || page.length === 0) break;
+      allSbIds = allSbIds.concat(page);
+      if (page.length < pageSize) break;
+      offset += pageSize;
+    }
+    if (allSbIds.length > 0) {
+      const sbIdSet = new Set(allSbIds.map(r => r.id));
       const idbAll = await idbGetAll();
       const deletedLocally = idbAll.filter(t =>
         !String(t.id).startsWith('tmp_') && !sbIdSet.has(t.id)
