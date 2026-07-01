@@ -584,10 +584,23 @@ async function deleteRepeatAll(masterId) {
 }
 
 async function insertRepeatException(masterId, dateStr, isDone = false) {
+  // 이미 같은 마스터+날짜 예외 행이 있으면 UPDATE, 없으면 INSERT
+  const all = await idbGetAll();
+  const existing = all.find(t =>
+    String(t.repeat_master_id) === String(masterId) &&
+    t.date === dateStr &&
+    t.repeat_exception === true
+  );
+
+  if (existing) {
+    // 이미 있으면 is_done만 UPDATE
+    await updateTodo(existing.id, { is_done: isDone, done_at: isDone ? new Date().toISOString() : null });
+    return existing;
+  }
+
   // 마스터 행은 AppState 또는 IDB에서 찾기
   let master = AppState.todos.find(t => t.id === masterId || t._masterId === masterId);
   if (!master) {
-    // AppState에 없으면 IDB에서 직접 조회
     try { master = await idbGet(masterId); } catch(e) {}
   }
   const now = new Date().toISOString();

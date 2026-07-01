@@ -144,15 +144,24 @@ async function sbFetch(path, options = {}) {
 }
 
 // ── 초기 동기화: Supabase → IDB ──
+// 페이지네이션으로 전체 데이터를 가져옴 (Supabase 기본 1000개 제한 우회)
 
 async function initialSync() {
   try {
-    const rows = await sbFetch(`${TABLE_NAME}?order=created_at.asc`);
-    if (rows && rows.length > 0) {
-      await idbClear();
-      await idbPutMany(rows);
+    let allRows = [];
+    let offset = 0;
+    const pageSize = 1000;
+    while (true) {
+      const page = await sbFetch(`${TABLE_NAME}?order=created_at.asc&limit=${pageSize}&offset=${offset}`);
+      if (!page || page.length === 0) break;
+      allRows = allRows.concat(page);
+      if (page.length < pageSize) break;
+      offset += pageSize;
     }
-
+    if (allRows.length > 0) {
+      await idbClear();
+      await idbPutMany(allRows);
+    }
   } catch(e) {
     console.warn('[sync] 초기 동기화 실패 (오프라인?)', e);
   }
