@@ -296,7 +296,8 @@ function isRepeatMatch(todo, dateStr) {
         const wd   = meta.monthWeekday ?? 1;
         if (targetDow !== wd) return false;
         const dayOfMonth = target.getDate();
-        const weekNum = Math.ceil(dayOfMonth / 7);
+        const firstDow = new Date(target.getFullYear(), target.getMonth(), 1).getDay();
+        const weekNum = Math.ceil((dayOfMonth + firstDow) / 7);
         if (week === 5) { // 마지막주
           const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
           return dayOfMonth > lastDay - 7;
