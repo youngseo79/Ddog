@@ -694,24 +694,22 @@ function pcUpdateMemoLinks() {
   });
 }
 
-/* 모달 열릴 때 링크 미리보기 업데이트 + 넘버링 들여쓰기 복원 */
+/* 모달 열릴 때 링크 미리보기 업데이트 */
 (function() {
-  function restoreIndent() {
+  function refreshLinks() {
     const memo = document.getElementById('input-memo');
-    if (memo && /^\d+\. /.test(memo.value) && /\n {4}\d+\. /.test(memo.value)) {
-      memo.value = '    ' + memo.value;
-    }
+    if (memo) pcUpdateMemoLinks();
   }
   const _origOpen = window.openEditModal;
   window.openEditModal = function(todo) {
     _origOpen(todo);
-    setTimeout(() => { pcUpdateMemoLinks(); restoreIndent(); }, 60);
+    setTimeout(refreshLinks, 60);
   };
   const _origAdd = window.openAddModal;
   if (_origAdd) {
     window.openAddModal = function(...args) {
       _origAdd(...args);
-      setTimeout(() => { pcUpdateMemoLinks(); restoreIndent(); }, 60);
+      setTimeout(refreshLinks, 60);
     };
   }
 })();
@@ -730,107 +728,166 @@ document.addEventListener('input', e => {
     _origClose(...args);
   };
 })();
-document.addEventListener('DOMContentLoaded', () => {
-  // modal.js가 #input-memo를 동적으로 사용하므로, 이벤트는 document에서 위임
-  document.addEventListener('keydown', function(e) {
-    const el = e.target;
-    if (el.id !== 'input-memo') return;
 
-    if (e.key === ' ') {
-      // "숫자." + 스페이스 → 번호 리스트 시작
-      const val = el.value;
-      const pos = el.selectionStart;
-      const lineStart = val.lastIndexOf('\n', pos - 1) + 1;
-      const lineText  = val.substring(lineStart, pos);
-      if (/^\d+\.$/.test(lineText)) {
-        e.preventDefault();
-        // 이전 번호 줄 기준으로 다음 번호 결정 (빈 줄 건너뜀)
-        const prevLines = val.substring(0, lineStart).split('\n');
-        let prevMatch = null;
-        for (let k = prevLines.length - 1; k >= 0; k--) {
-          const m = prevLines[k].match(/^ {4}(\d+)\. /);
-          if (m) { prevMatch = m; break; }
-        }
-        const num = prevMatch ? parseInt(prevMatch[1]) + 1 : parseInt(lineText);
-        const prefix = `${num}. `;
-        const indent = '    '; // 들여쓰기 4칸
-        const newLine = indent + prefix;
-        // 현재 줄을 들여쓰기+번호로 교체
-        const before = val.substring(0, lineStart);
-        const after  = val.substring(pos);
-        el.value = before + newLine + after;
-        el.selectionStart = el.selectionEnd = lineStart + newLine.length;
-      }
-    }
-
-    if (e.key === 'Enter') {
-      const val = el.value;
-      const pos = el.selectionStart;
-      const lineStart = val.lastIndexOf('\n', pos - 1) + 1;
-      const lineText  = val.substring(lineStart, pos);
-
-      // 들여쓰기된 번호 줄인지 확인: "    N. 내용"
-      const match = lineText.match(/^( {4})(\d+)\. (.*)/);
-      if (!match) return;
-
-      e.preventDefault();
-      const indent  = match[1];
-      const num     = parseInt(match[2]);
-      const content = match[3];
-
-      if (content === '') {
-        // 빈 번호 줄 → 번호 제거하고 리스트 종료
-        const before = val.substring(0, lineStart);
-        const after  = val.substring(pos);
-        el.value = before + after;
-        el.selectionStart = el.selectionEnd = lineStart;
-      } else {
-        // 내용 있는 줄 → 다음 번호 생성
-        const nextPrefix = `${indent}${num + 1}. `;
-        const before = val.substring(0, pos);
-        const after  = val.substring(pos);
-        el.value = before + '\n' + nextPrefix + after;
-        el.selectionStart = el.selectionEnd = pos + 1 + nextPrefix.length;
-      }
-    }
-  });
-});
-
-/* ── 메모 자동 번호 재정렬 (삭제 시) ── */
+/* ── 메모 자동 번호 리스트 — aimemo 방식 (keydown + beforeinput + input) ── */
 (function() {
-  function _renumberLines(text) {
-    const lines = text.split('\n');
-    let changed = false;
-    let i = 0;
-    while (i < lines.length) {
-      if (/^ {4}\d+\. /.test(lines[i])) {
-        const startNum = parseInt(lines[i].match(/^ {4}(\d+)\. /)[1]);
-        let j = i, counter = startNum;
-        while (j < lines.length && /^ {4}\d+\. /.test(lines[j])) {
-          const newLine = lines[j].replace(/^( {4})\d+(\. )/, '$1' + counter + '$2');
-          if (newLine !== lines[j]) { lines[j] = newLine; changed = true; }
-          counter++;
-          j++;
-        }
-        i = j;
-      } else {
-        i++;
+  function attachMemoNumbering() {
+    const ta = document.getElementById('input-memo');
+    if (!ta || ta._aimemoAttached) return;
+    ta._aimemoAttached = true;
+    let mode = null; // null | 'bullet' | 'number'
+
+    function handleSpace(preventFn) {
+      const start = ta.selectionStart;
+      const before = ta.value.substring(0, start);
+      const lines = before.split('\n');
+      const curLine = lines[lines.length - 1];
+      const numMatch = curLine.match(/^(\d+)\.$/);
+      if (numMatch && mode !== 'number') {
+        preventFn();
+        const lineStart = before.lastIndexOf('\n') + 1;
+        ta.value = ta.value.substring(0, lineStart) + numMatch[1] + '. ' + ta.value.substring(start);
+        ta.selectionStart = ta.selectionEnd = lineStart + numMatch[1].length + 2;
+        mode = 'number';
+        return true;
       }
+      if (curLine === '*' && mode !== 'bullet') {
+        preventFn();
+        const lineStart = before.lastIndexOf('\n') + 1;
+        ta.value = ta.value.substring(0, lineStart) + '• ' + ta.value.substring(start);
+        ta.selectionStart = ta.selectionEnd = lineStart + 2;
+        mode = 'bullet';
+        return true;
+      }
+      return false;
     }
-    return changed ? lines.join('\n') : text;
+
+    function handleEnter(preventFn, isShift) {
+      if (!mode) return false;
+      if (isShift) {
+        preventFn();
+        const start = ta.selectionStart;
+        const before = ta.value.substring(0, start);
+        const after = ta.value.substring(ta.selectionEnd);
+        ta.value = before + '\n' + after;
+        ta.selectionStart = ta.selectionEnd = start + 1;
+        return true;
+      }
+      preventFn();
+      const start = ta.selectionStart;
+      const before = ta.value.substring(0, start);
+      const after = ta.value.substring(ta.selectionEnd);
+      const lines = before.split('\n');
+      const curLine = lines[lines.length - 1];
+      if (mode === 'bullet') {
+        if (curLine === '• ') {
+          ta.value = before.slice(0, -2) + '\n' + after;
+          ta.selectionStart = ta.selectionEnd = start - 2 + 1;
+          mode = null; return true;
+        }
+        const insert = '\n• ';
+        ta.value = before + insert + after;
+        ta.selectionStart = ta.selectionEnd = start + insert.length;
+      } else if (mode === 'number') {
+        const match = curLine.match(/^(\d+)\.\s/);
+        if (match && curLine === match[0]) {
+          const trim2 = before.slice(0, -match[0].length);
+          ta.value = trim2 + '\n' + after;
+          ta.selectionStart = ta.selectionEnd = trim2.length + 1;
+          mode = null; return true;
+        }
+        const nextNum = match ? parseInt(match[1]) + 1 : 1;
+        const insert = '\n' + nextNum + '. ';
+        const afterLines = after.split('\n');
+        let renumFrom = nextNum + 1;
+        const renumberedAfter = afterLines.map((line, idx) => {
+          if (idx === 0) return line;
+          const lm = line.match(/^(\d+)(\.\s)/);
+          if (lm) return renumFrom++ + lm[2] + line.slice(lm[0].length);
+          return line;
+        }).join('\n');
+        ta.value = before + insert + renumberedAfter;
+        ta.selectionStart = ta.selectionEnd = start + insert.length;
+      }
+      return true;
+    }
+
+    function renumberAll() {
+      const pos = ta.selectionStart;
+      const lines = ta.value.split('\n');
+      let inBlock = false, blockStart = 0, blockOffset = 0, changed = false;
+      const result = lines.map(line => {
+        const m = line.match(/^(\d+)(\.\s)([\s\S]*)$/);
+        if (m) {
+          if (!inBlock) { inBlock = true; blockStart = parseInt(m[1], 10); blockOffset = 0; }
+          const expected = blockStart + blockOffset++;
+          const newLine = expected + m[2] + m[3];
+          if (newLine !== line) changed = true;
+          return newLine;
+        } else { inBlock = false; return line; }
+      });
+      if (!changed) return;
+      const oldLines = lines, newLines = result;
+      let oldOffset = 0, newOffset = 0;
+      for (let i = 0; i < oldLines.length; i++) {
+        const oldEnd = oldOffset + oldLines[i].length + (i < oldLines.length - 1 ? 1 : 0);
+        const newEnd = newOffset + newLines[i].length + (i < newLines.length - 1 ? 1 : 0);
+        if (pos <= oldEnd) {
+          const posInLine = pos - oldOffset;
+          const om = oldLines[i].match(/^(\d+\.\s)/);
+          const nm = newLines[i].match(/^(\d+\.\s)/);
+          const diff = nm && om ? nm[1].length - om[1].length : 0;
+          const newPos = newOffset + Math.max(nm ? nm[1].length : 0, posInLine + diff);
+          ta.value = newLines.join('\n');
+          ta.selectionStart = ta.selectionEnd = newPos;
+          return;
+        }
+        oldOffset = oldEnd; newOffset = newEnd;
+      }
+      ta.value = newLines.join('\n');
+      ta.selectionStart = ta.selectionEnd = pos;
+    }
+
+    ta.addEventListener('keydown', function(e) {
+      if (e.key === ' ') handleSpace(() => e.preventDefault());
+      else if (e.key === 'Enter') handleEnter(() => e.preventDefault(), e.shiftKey);
+    });
+
+    ta.addEventListener('beforeinput', function(e) {
+      if (e.inputType === 'insertText' && e.data === ' ')
+        handleSpace(() => e.preventDefault());
+      else if (e.inputType === 'insertLineBreak' || (e.inputType === 'insertText' && e.data === '\n'))
+        handleEnter(() => e.preventDefault(), false);
+    });
+
+    ta.addEventListener('input', function() {
+      if (ta.value === '') { mode = null; return; }
+      if (mode === 'number') renumberAll();
+    });
+
+    // 모달 열릴 때 mode 리셋
+    ta._memoModeReset = function() { mode = null; };
   }
 
-  document.addEventListener('input', function(e) {
-    const el = e.target;
-    if (el.id !== 'input-memo') return;
-    const val = el.value;
-    const renum = _renumberLines(val);
-    if (renum !== val) {
-      const s = el.selectionStart;
-      el.value = renum;
-      el.selectionStart = el.selectionEnd = s;
-    }
+  // DOMContentLoaded 후 input-memo가 이미 있으면 바로, 없으면 모달 열릴 때 부착
+  document.addEventListener('DOMContentLoaded', () => {
+    attachMemoNumbering();
   });
+
+  // openEditModal / openAddModal 래핑: mode 리셋 + 늦게 생성된 ta 대응
+  const _wrapOpen = function(orig) {
+    return function(...args) {
+      orig(...args);
+      setTimeout(() => {
+        const ta = document.getElementById('input-memo');
+        if (ta && ta._memoModeReset) ta._memoModeReset();
+        attachMemoNumbering();
+      }, 0);
+    };
+  };
+  if (window.openEditModal) window.openEditModal = _wrapOpen(window.openEditModal);
+  if (window.openAddModal)  window.openAddModal  = _wrapOpen(window.openAddModal);
+
 })();
 
 (function() {
