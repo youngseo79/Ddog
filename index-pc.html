@@ -737,6 +737,24 @@ document.addEventListener('input', e => {
     ta._aimemoAttached = true;
     let mode = null; // null | 'bullet' | 'number'
 
+    // ── 커서 위치를 textarea 뷰포트 안으로 스크롤 ──
+    // JS로 value를 직접 조작하면 브라우저가 scrollTop을 자동 갱신하지 않아
+    // 커서가 한 줄 위에 머무는 버그가 발생하므로 수동으로 보정한다.
+    function scrollCursorIntoView(el) {
+      const style = window.getComputedStyle(el);
+      const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.5;
+      const paddingTop = parseFloat(style.paddingTop) || 0;
+      const pos = el.selectionStart;
+      const linesBefore = el.value.substring(0, pos).split('\n').length;
+      const cursorY = paddingTop + (linesBefore - 1) * lineHeight;
+      const visibleBottom = el.scrollTop + el.clientHeight;
+      if (cursorY + lineHeight > visibleBottom) {
+        el.scrollTop = cursorY + lineHeight - el.clientHeight + lineHeight;
+      } else if (cursorY < el.scrollTop) {
+        el.scrollTop = cursorY - paddingTop;
+      }
+    }
+
     function handleSpace(preventFn) {
       const start = ta.selectionStart;
       const before = ta.value.substring(0, start);
@@ -749,6 +767,7 @@ document.addEventListener('input', e => {
         ta.value = ta.value.substring(0, lineStart) + numMatch[1] + '. ' + ta.value.substring(start);
         ta.selectionStart = ta.selectionEnd = lineStart + numMatch[1].length + 2;
         mode = 'number';
+        scrollCursorIntoView(ta);
         return true;
       }
       if (curLine === '*' && mode !== 'bullet') {
@@ -757,6 +776,7 @@ document.addEventListener('input', e => {
         ta.value = ta.value.substring(0, lineStart) + '• ' + ta.value.substring(start);
         ta.selectionStart = ta.selectionEnd = lineStart + 2;
         mode = 'bullet';
+        scrollCursorIntoView(ta);
         return true;
       }
       return false;
@@ -771,6 +791,7 @@ document.addEventListener('input', e => {
         const after = ta.value.substring(ta.selectionEnd);
         ta.value = before + '\n' + after;
         ta.selectionStart = ta.selectionEnd = start + 1;
+        scrollCursorIntoView(ta);
         return true;
       }
       preventFn();
@@ -809,6 +830,7 @@ document.addEventListener('input', e => {
         ta.value = before + insert + renumberedAfter;
         ta.selectionStart = ta.selectionEnd = start + insert.length;
       }
+      scrollCursorIntoView(ta);
       return true;
     }
 
@@ -849,20 +871,25 @@ document.addEventListener('input', e => {
     }
 
     ta.addEventListener('keydown', function(e) {
-      if (e.key === ' ') handleSpace(() => e.preventDefault());
-      else if (e.key === 'Enter') handleEnter(() => e.preventDefault(), e.shiftKey);
+      let handled = false;
+      if (e.key === ' ') handled = handleSpace(() => e.preventDefault());
+      else if (e.key === 'Enter') handled = handleEnter(() => e.preventDefault(), e.shiftKey);
+      if (handled) requestAnimationFrame(() => scrollCursorIntoView(ta));
     });
 
     ta.addEventListener('beforeinput', function(e) {
+      let handled = false;
       if (e.inputType === 'insertText' && e.data === ' ')
-        handleSpace(() => e.preventDefault());
+        handled = handleSpace(() => e.preventDefault());
       else if (e.inputType === 'insertLineBreak' || (e.inputType === 'insertText' && e.data === '\n'))
-        handleEnter(() => e.preventDefault(), false);
+        handled = handleEnter(() => e.preventDefault(), false);
+      if (handled) requestAnimationFrame(() => scrollCursorIntoView(ta));
     });
 
     ta.addEventListener('input', function() {
       if (ta.value === '') { mode = null; return; }
       if (mode === 'number') renumberAll();
+      scrollCursorIntoView(ta);
     });
 
     // 모달 열릴 때 mode 리셋
