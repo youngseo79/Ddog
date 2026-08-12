@@ -455,33 +455,14 @@ function closeRepeatsPanel() {
 // ── 반복함 표시 판정 ──
 // 마스터가 "오늘(today) 이후로 아직 살아있는 발생분"을 하나라도 가지고 있는지 검사.
 //  · 종료일 없는 무한 반복 → 미래가 항상 존재하므로 항상 표시
-//  · 종료일이 이미 지난 반복 → 더 나올 게 없으므로 숨김
-//  · 종료일이 남아있으면 오늘~종료일 사이에 '삭제 안 된 매칭 날짜'가 있는지 스캔
+//  · repeat_end_date가 설정된 반복 → "이날짜 이후 삭제"로 종료된 것 → 반복함에서 숨김
+//  · repeat_end_date 없는 무한 반복만 반복함에 표시
 // ※ '이 날짜만 삭제'(repeat_deleted 예외 행)로 지워진 날짜는 발생분에서 제외
 function hasRemainingOccurrence(master, allRows, today) {
   // 무한 반복: 앞으로 계속 나옴 → 항상 표시
   if (!master.repeat_end_date) return true;
 
-  const end = master.repeat_end_date;
-  // 종료일이 오늘보다 이전 → 남은 발생분 없음 → 숨김
-  if (end < today) return false;
-
-  // 이 마스터에서 '이 날짜만 삭제' 처리된 날짜 집합
-  const deletedDates = new Set(
-    allRows
-      .filter(t => String(t.repeat_master_id) === String(master.id) && t.repeat_deleted)
-      .map(t => t.date)
-  );
-
-  // 시작일이 미래면 시작일부터, 아니면 오늘부터 종료일까지 스캔
-  const startStr = master.date > today ? master.date : today;
-  const startDate = new Date(startStr + 'T00:00:00');
-  const endDate   = new Date(end + 'T00:00:00');
-
-  for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-    const ds = toLocalDateStr(d);
-    if (isRepeatMatch(master, ds) && !deletedDates.has(ds)) return true;
-  }
+  // repeat_end_date가 설정된 것 자체를 "이후 삭제로 종료된 반복"으로 간주 → 숨김
   return false;
 }
 
