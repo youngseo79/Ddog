@@ -740,18 +740,45 @@ document.addEventListener('input', e => {
     // ── 커서 위치를 textarea 뷰포트 안으로 스크롤 ──
     // JS로 value를 직접 조작하면 브라우저가 scrollTop을 자동 갱신하지 않아
     // 커서가 한 줄 위에 머무는 버그가 발생하므로 수동으로 보정한다.
+    // mirror div 방식: word-wrap된 실제 픽셀 높이를 반영하여 계산한다.
+    let _mirror = null;
+    function _getMirror(el) {
+      if (!_mirror) {
+        _mirror = document.createElement('div');
+        _mirror.style.cssText = [
+          'position:absolute', 'top:-9999px', 'left:-9999px',
+          'visibility:hidden', 'white-space:pre-wrap', 'word-wrap:break-word',
+          'overflow-wrap:break-word', 'border:0', 'margin:0'
+        ].join(';');
+        document.body.appendChild(_mirror);
+      }
+      const s = window.getComputedStyle(el);
+      ['font-size','font-family','font-weight','line-height',
+       'padding-top','padding-bottom','padding-left','padding-right',
+       'border-top-width','border-bottom-width','box-sizing'].forEach(p => {
+        _mirror.style[p] = s[p];
+      });
+      _mirror.style.width = el.clientWidth + 'px';
+      return _mirror;
+    }
     function scrollCursorIntoView(el) {
-      const style = window.getComputedStyle(el);
-      const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.5;
-      const paddingTop = parseFloat(style.paddingTop) || 0;
       const pos = el.selectionStart;
-      const linesBefore = el.value.substring(0, pos).split('\n').length;
-      const cursorY = paddingTop + (linesBefore - 1) * lineHeight;
+      const textBefore = el.value.substring(0, pos);
+      const m = _getMirror(el);
+      const escaped = textBefore.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n$/,'\n\u200b');
+      m.innerHTML = escaped + '<span id="_cur_marker">\u200b</span>';
+      const marker = m.querySelector('#_cur_marker');
+      if (!marker) return;
+      const mirrorRect = m.getBoundingClientRect();
+      const markerRect = marker.getBoundingClientRect();
+      const cursorY    = markerRect.top - mirrorRect.top;
+      const s          = window.getComputedStyle(el);
+      const lineHeight = parseFloat(s.lineHeight) || parseFloat(s.fontSize) * 1.5;
       const visibleBottom = el.scrollTop + el.clientHeight;
       if (cursorY + lineHeight > visibleBottom) {
         el.scrollTop = cursorY + lineHeight - el.clientHeight + lineHeight;
       } else if (cursorY < el.scrollTop) {
-        el.scrollTop = cursorY - paddingTop;
+        el.scrollTop = cursorY;
       }
     }
 
@@ -821,10 +848,12 @@ document.addEventListener('input', e => {
         const insert = '\n' + nextNum + '. ';
         const afterLines = after.split('\n');
         let renumFrom = nextNum + 1;
+        let inSameBlock = true; // 같은 그룹 내에서만 재번호
         const renumberedAfter = afterLines.map((line, idx) => {
           if (idx === 0) return line;
           const lm = line.match(/^(\d+)(\.\s)/);
-          if (lm) return renumFrom++ + lm[2] + line.slice(lm[0].length);
+          if (lm && inSameBlock) return renumFrom++ + lm[2] + line.slice(lm[0].length);
+          if (!lm) inSameBlock = false; // 빈 줄/일반 텍스트 → 그룹 끊김
           return line;
         }).join('\n');
         ta.value = before + insert + renumberedAfter;
@@ -862,12 +891,14 @@ document.addEventListener('input', e => {
           const newPos = newOffset + Math.max(nm ? nm[1].length : 0, posInLine + diff);
           ta.value = newLines.join('\n');
           ta.selectionStart = ta.selectionEnd = newPos;
+          requestAnimationFrame(() => scrollCursorIntoView(ta));
           return;
         }
         oldOffset = oldEnd; newOffset = newEnd;
       }
       ta.value = newLines.join('\n');
       ta.selectionStart = ta.selectionEnd = pos;
+      requestAnimationFrame(() => scrollCursorIntoView(ta));
     }
 
     ta.addEventListener('keydown', function(e) {
@@ -889,7 +920,6 @@ document.addEventListener('input', e => {
     ta.addEventListener('input', function() {
       if (ta.value === '') { mode = null; return; }
       if (mode === 'number') renumberAll();
-      scrollCursorIntoView(ta);
     });
 
     // 모달 열릴 때 mode 리셋
@@ -910,6 +940,11 @@ document.addEventListener('input', e => {
         if (ta && ta._memoModeReset) ta._memoModeReset();
         attachMemoNumbering();
       }, 0);
+      // 모달을 열 때마다 메모 textarea 스크롤을 항상 최상단으로 리셋
+      requestAnimationFrame(() => {
+        const ta = document.getElementById('input-memo');
+        if (ta) ta.scrollTop = 0;
+      });
     };
   };
   if (window.openEditModal) window.openEditModal = _wrapOpen(window.openEditModal);
