@@ -75,6 +75,8 @@
     }
     .day-col { display: flex; flex-direction: column; align-items: center; gap: 3px; }
     .day-name { font-size: 11px; font-weight: 600; color: var(--text-light); text-align: center; }
+    .day-name.sun, .month-day-header.sun { color: #e5484d; }
+    .day-name.sat, .month-day-header.sat { color: #3b82f6; }
     .day-num {
       width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
       font-family: 'Nunito', sans-serif; font-size: 13px; font-weight: 700; color: var(--text-mid);
@@ -233,6 +235,7 @@
     .month-dot.future { background: #eef0ea; cursor: default; opacity: 0.45; }
     .month-dot.miss { background: #eef0ea; }
     .month-dot.miss .month-dot-label { color: var(--text-light); }
+    .month-dot-x { position: absolute; top: 0; left: 0; right: 0; bottom: 3px; display: flex; align-items: center; justify-content: center; z-index: 2; color: #c25; font-size: 13px; font-weight: 800; line-height: 1; }
     .month-dot.today-dot { box-shadow: 0 0 0 2px var(--purple-mid); }
     .month-nav {
       display: flex; align-items: center; justify-content: space-between;
@@ -637,8 +640,8 @@ function addDays(d, n) { const r=new Date(d); r.setDate(r.getDate()+n); return r
 const DAY_NAMES = ['일','월','화','수','목','금','토'];
 function getWeekDates(offset=0) {
   const today=new Date(); today.setHours(0,0,0,0); const dow=today.getDay();
-  const monday=addDays(today,-dow+(dow===0?-6:1)+offset*7);
-  return Array.from({length:7},(_,i)=>addDays(monday,i));
+  const sunday=addDays(today,-dow+offset*7);
+  return Array.from({length:7},(_,i)=>addDays(sunday,i));
 }
 function loadAll() { habitDefs=loadDefs().sort((a,b)=>(a.sort_order??999)-(b.sort_order??999)); habitLogs=loadLogs(); }
 function shiftWeek(dir) { if (dir>0&&weekOffset>=0) return; weekOffset+=dir; renderWeek(); }
@@ -650,7 +653,7 @@ function renderWeek() {
   const nextBtn=document.querySelector('.week-nav-btn:last-child');
   if (nextBtn) { nextBtn.style.opacity=weekOffset>=0?'0.25':'1'; nextBtn.style.pointerEvents=weekOffset>=0?'none':''; }
   const hdr=document.getElementById('week-days-header');
-  hdr.innerHTML=dates.map(d=>{ const isToday=dateStr(d)===dateStr(today); return `<div class="day-col"><div class="day-name">${DAY_NAMES[d.getDay()]}</div><div class="day-num${isToday?' today':''}">${d.getDate()}</div></div>`; }).join('');
+  hdr.innerHTML=dates.map(d=>{ const isToday=dateStr(d)===dateStr(today); return `<div class="day-col"><div class="day-name${d.getDay()===0?' sun':d.getDay()===6?' sat':''}">${DAY_NAMES[d.getDay()]}</div><div class="day-num${isToday?' today':''}">${d.getDate()}</div></div>`; }).join('');
   const list=document.getElementById('week-habits-list');
   if (habitDefs.length===0) { list.innerHTML=`<div class="empty-state"><div class="empty-icon">✅</div><p>아직 등록된 습관이 없어요.<br>아래 <strong>＋</strong> 버튼으로 추가해보세요!</p></div>`; return; }
   list.innerHTML=habitDefs.map(h => {
@@ -696,7 +699,7 @@ function renderMonth() {
   document.getElementById('month-label').textContent=`${y}년 ${m+1}월`;
   const list=document.getElementById('month-habits-list');
   if (habitDefs.length===0) { list.innerHTML=`<div class="empty-state"><div class="empty-icon">📆</div><p>등록된 습관이 없어요.</p></div>`; return; }
-  const dayHeaders=DAY_NAMES.map(n=>`<div class="month-day-header">${n}</div>`).join('');
+  const dayHeaders=DAY_NAMES.map((n,i)=>`<div class="month-day-header${i===0?' sun':i===6?' sat':''}">${n}</div>`).join('');
   const blanks=Array.from({length:firstDow},()=>`<div class="month-dot empty"></div>`).join('');
   list.innerHTML=habitDefs.map(h=>{
     let totalPctSum=0, totalDays=0;
@@ -708,7 +711,9 @@ function renderMonth() {
       const rawPct=dayAchievePct(h,ds), stepPct=toStep10(rawPct);
       const labelColor=stepPct>=60?'white':(stepPct>0?'var(--purple-dark)':'var(--text-light)');
       let cls='month-dot'+(rawPct===0?' miss':'')+(isToday?' today-dot':'');
-      return `<div class="${cls}"><div class="month-dot-fill" style="height:${stepPct}%"></div><div class="month-dot-label" style="color:${labelColor}">${day}</div></div>`;
+      const isMissed=!!(habitLogs[logKey(h.habit_id,ds)]||{}).missed;
+      const xMark=isMissed?'<div class="month-dot-x">✕</div>':'';
+      return `<div class="${cls}"><div class="month-dot-fill" style="height:${stepPct}%"></div>${xMark}<div class="month-dot-label" style="color:${labelColor}">${day}</div></div>`;
     }).join('');
     const overallRaw=totalDays>0?totalPctSum/(totalDays*100)*100:0;
     const overallPct=Math.abs(overallRaw%1)<0.05?Math.round(overallRaw)+'%':overallRaw.toFixed(1)+'%';
