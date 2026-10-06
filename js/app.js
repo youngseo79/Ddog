@@ -47,18 +47,23 @@ async function bootApp() {
 function initLightMode() {
   applyLogoMode();
   document.getElementById('lightmode-toggle').addEventListener('click', () => {
-    // 컬러 테마 활성 시 토글 무시
-    if (document.body.classList.contains('theme-active')) return;
-    const isLight = document.body.classList.toggle('light-mode');
-    localStorage.setItem('lightmode', isLight ? '1' : '0');
-    localStorage.setItem('app-theme', isLight ? 'light' : 'dark');
-    applyLogoMode();
+    // 어떤 테마에서든 토글 → 다크 모드 / 다크 모드에서 토글 → 직전 테마로 복귀
+    const current = localStorage.getItem('app-theme') || (localStorage.getItem('lightmode') === '1' ? 'light' : 'dark');
+    if (current === 'dark') {
+      let prev = localStorage.getItem('app-theme-prev') || 'light';
+      // 삭제된 테마가 직전 테마로 남아있는 경우 대체 테마로 변환, 다크로 이어지면 라이트로
+      if (typeof LEGACY_THEMES !== 'undefined' && LEGACY_THEMES[prev]) prev = LEGACY_THEMES[prev];
+      if (prev === 'dark') prev = 'light';
+      applyTheme(prev);
+    } else {
+      applyTheme('dark');
+    }
   });
 }
 
 function applyLogoMode() {
-  const isLight = document.body.classList.contains('light-mode');
-  const src = isLight ? 'logo1.png' : 'logo.png';
+  // 투명 배경 로고 하나로 통일 (배경색은 테마별 CSS가 처리)
+  const src = 'logo2.png';
   // 스플래시 + 로그인 화면 로고 모두 교체
   const splashLogo = document.getElementById('splash-logo');
   const loginLogo  = document.getElementById('login-logo');

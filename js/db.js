@@ -9,6 +9,10 @@
 
 async function sbPush(path, method, body) {
   if (AppState.isOnline) {
+    // 전송 중인 행 표시 → bgSync가 전송 완료 전의 서버값으로 덮어쓰지 않도록
+    const m = String(path).match(/[?&]id=eq\.([^&]+)/);
+    const inflightId = m ? decodeURIComponent(m[1]) : null;
+    if (inflightId && typeof _inflightIds !== 'undefined') _inflightIds.add(inflightId);
     try {
       const res = await fetch(`${DB.url}/rest/v1/${path}`, {
         method,
@@ -23,6 +27,8 @@ async function sbPush(path, method, body) {
       console.warn('[db] push 실패, queue에 저장:', e);
       await queuePush({ path, method, body });
       return null;
+    } finally {
+      if (inflightId && typeof _inflightIds !== 'undefined') _inflightIds.delete(inflightId);
     }
   } else {
     // 오프라인 → queue에 저장
@@ -289,7 +295,7 @@ async function insertTodo(data) {
   // 오프라인 or 실패 → 임시 id로 IDB 저장 + queue
   const localTodo = { ...payload, id: tempId };
   await idbPut(localTodo);
-  await queuePush({ path: TABLE_NAME, method: 'POST', body: payload });
+  await queuePush({ path: TABLE_NAME, method: 'POST', body: payload, tmpId: tempId });
   return localTodo;
 }
 
@@ -327,13 +333,16 @@ async function insertRemindCopy(original, remindDate, dateLabel) {
   const tempId = 'tmp_' + Date.now() + '_' + Math.random().toString(36).slice(2);
   const localTodo = { ...payload, id: tempId };
   await idbPut(localTodo);
-  await queuePush({ path: TABLE_NAME, method: 'POST', body: payload });
+  await queuePush({ path: TABLE_NAME, method: 'POST', body: payload, tmpId: tempId });
   return localTodo;
 }
 
 // ── UPDATE ──
 
 async function updateTodo(id, data) {
+  // 이미 서버에 올라가 진짜 id가 생긴 tmp 행이면 진짜 id로 처리
+  id = resolveTmpId(id);
+
   const now = new Date().toISOString();
   const patch = { ...data, updated_at: now };
 
@@ -347,6 +356,9 @@ async function updateTodo(id, data) {
   const isTmp = String(id).startsWith('tmp_');
   if (!isTmp) {
     await sbPush(`${TABLE_NAME}?id=eq.${id}`, 'PATCH', patch);
+  } else {
+    // 아직 서버에 안 올라간 행 → 대기 중인 등록 내용에 수정사항을 합쳐서 함께 전송
+    await queueMergeTmpPatch(id, patch, existing);
   }
 }
 
@@ -403,10 +415,15 @@ async function updateSortOrders(todos) {
 // ── DELETE ──
 
 async function deleteTodo(id) {
-  await idbDelete(id);
+  id = resolveTmpId(id);
   const isTmp = String(id).startsWith('tmp_');
+  const existing = isTmp ? await idbGet(id) : null;
+  await idbDelete(id);
   if (!isTmp) {
     await sbPush(`${TABLE_NAME}?id=eq.${id}`, 'DELETE', null);
+  } else {
+    // 아직 서버에 안 올라간 행 → 대기 중인 등록도 취소
+    await queueRemoveTmp(id, existing);
   }
 }
 
@@ -511,12 +528,12 @@ async function deleteRepeatOnlyDate(masterId, dateStr) {
       } catch(e) {
         const tempId = 'tmp_' + Date.now() + '_' + Math.random().toString(36).slice(2);
         await idbPut({ ...payload, id: tempId });
-        await queuePush({ path: TABLE_NAME, method: 'POST', body: payload });
+        await queuePush({ path: TABLE_NAME, method: 'POST', body: payload, tmpId: tempId });
       }
     } else {
       const tempId = 'tmp_' + Date.now() + '_' + Math.random().toString(36).slice(2);
       await idbPut({ ...payload, id: tempId });
-      await queuePush({ path: TABLE_NAME, method: 'POST', body: payload });
+      await queuePush({ path: TABLE_NAME, method: 'POST', body: payload, tmpId: tempId });
     }
   }
 
@@ -554,12 +571,19 @@ async function deleteRepeatFromDate(masterId, dateStr) {
 
 // 3. 전체 삭제: 마스터 + 모든 예외 행
 async function deleteRepeatAll(masterId) {
+  masterId = resolveTmpId(masterId);
+
   // IDB에서 마스터 + 예외 행 모두 즉시 삭제
   const all = await idbGetAll();
   const toDeletes = all.filter(t =>
     String(t.id) === String(masterId) || String(t.repeat_master_id) === String(masterId)
   );
   await Promise.all(toDeletes.map(t => idbDelete(t.id)));
+
+  // 아직 서버에 안 올라간 행(tmp)은 대기 중인 등록도 취소
+  for (const t of toDeletes) {
+    if (String(t.id).startsWith('tmp_')) await queueRemoveTmp(t.id, t);
+  }
 
   // Supabase 삭제 — 예외 행 먼저, 마스터 나중에 (FK 순서)
   if (AppState.isOnline) {
@@ -641,7 +665,7 @@ async function insertRepeatException(masterId, dateStr, isDone = false) {
   const tempId = 'tmp_' + Date.now() + '_' + Math.random().toString(36).slice(2);
   const localTodo = { ...payload, id: tempId };
   await idbPut(localTodo);
-  await queuePush({ path: TABLE_NAME, method: 'POST', body: payload });
+  await queuePush({ path: TABLE_NAME, method: 'POST', body: payload, tmpId: tempId });
   return localTodo;
 }
 
@@ -694,7 +718,7 @@ async function updateRepeatOnlyDate(masterId, dateStr, data) {
     }
     const tempId = 'tmp_' + Date.now() + '_' + Math.random().toString(36).slice(2);
     await idbPut({ ...payload, id: tempId });
-    await queuePush({ path: TABLE_NAME, method: 'POST', body: payload });
+    await queuePush({ path: TABLE_NAME, method: 'POST', body: payload, tmpId: tempId });
   }
 }
 
@@ -764,7 +788,7 @@ async function updateRepeatFromDate(masterId, dateStr, data) {
   }
   const tempId = 'tmp_' + Date.now() + '_' + Math.random().toString(36).slice(2);
   await idbPut({ ...newPayload, id: tempId });
-  await queuePush({ path: TABLE_NAME, method: 'POST', body: newPayload });
+  await queuePush({ path: TABLE_NAME, method: 'POST', body: newPayload, tmpId: tempId });
 }
 
 // 3. 전체 수정: 마스터 업데이트 + 모든 예외 행 삭제 후 재생성 없이 마스터만 업데이트

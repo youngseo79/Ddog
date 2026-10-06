@@ -160,7 +160,7 @@ function _updateStorageHeaderDate() {
   const dow  = d.getDay();
   el.textContent = `${d.getMonth()+1}월 ${d.getDate()}일 (${days[dow]})`;
   el.style.color = dow === 0 ? 'var(--danger)' :
-                   dow === 6 ? '#6b9fd4' :
+                   dow === 6 ? 'var(--sat)' :
                    'var(--text-primary)';
 }
 
@@ -650,7 +650,7 @@ function _openStorageDatePicker(storageId, isPc, onSelect) {
     ['일','월','화','수','목','금','토'].forEach((d, i) => {
       const span = document.createElement('div');
       span.textContent = d;
-      span.style.cssText = `text-align:center;font-size:12px;font-weight:600;padding:4px 0;color:${i===0?'var(--danger)':i===6?'#6b9fd4':'var(--text-muted)'};`;
+      span.style.cssText = `text-align:center;font-size:12px;font-weight:600;padding:4px 0;color:${i===0?'var(--danger)':i===6?'var(--sat)':'var(--text-muted)'};`;
       wdays.appendChild(span);
     });
     popup.appendChild(wdays);
@@ -670,7 +670,7 @@ function _openStorageDatePicker(storageId, isPc, onSelect) {
       cell.textContent = d;
       const isToday = dateStr === todayStr2;
       const dow = new Date(pickerYear, pickerMonth - 1, d).getDay();
-      const color = dow === 0 ? 'var(--danger)' : dow === 6 ? '#6b9fd4' : 'var(--text-primary)';
+      const color = dow === 0 ? 'var(--danger)' : dow === 6 ? 'var(--sat)' : 'var(--text-primary)';
       cell.style.cssText = `
         aspect-ratio:1;width:100%;border:none;cursor:pointer;border-radius:50%;
         font-size:15px;font-weight:${isToday?'700':'400'};

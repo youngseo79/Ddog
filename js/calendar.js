@@ -3,6 +3,7 @@
 // =============================================
 
 let calCollapsed = false;
+let miniWeekStart = null; // 축소(한 줄) 달력에 표시 중인 주의 일요일
 
 function initCalendar() {
   document.getElementById('cal-toggle-btn').addEventListener('click', toggleCalendar);
@@ -56,12 +57,23 @@ function toggleCalendar() {
     section.classList.add('collapsed');
     // 아이콘 → 아래 화살표
     icon.innerHTML = '<polyline points="6 9 12 15 18 9"></polyline>';
-    renderMiniWeek();
+    // 축소 시: 항상 이번주 표시 + 오늘로 자동 선택
+    const today = new Date();
+    miniWeekStart = new Date(today.getFullYear(), today.getMonth(), today.getDate() - today.getDay());
+    AppState.calYear  = today.getFullYear();
+    AppState.calMonth = today.getMonth() + 1;
+    selectDate(toLocalDateStr(today)); // 내부에서 renderMiniWeek + 라벨 + loadTodos
+    updateMonthDots();
   } else {
     section.classList.remove('collapsed');
     // 아이콘 → 위 화살표
     icon.innerHTML = '<polyline points="18 15 12 9 6 15"></polyline>';
+    // 펼칠 때: 선택된 날짜가 있는 달 표시
+    const [sy, sm] = AppState.selectedDate.split('-').map(Number);
+    AppState.calYear  = sy;
+    AppState.calMonth = sm;
     renderCalendar();
+    updateMonthDots();
   }
 }
 
@@ -70,11 +82,12 @@ function renderMiniWeek() {
   const todayStr = toLocalDateStr(today);
   const selectedDate = AppState.selectedDate;
 
-  // 선택된 날짜가 포함된 주를 기준으로 렌더링
-  const baseDate = new Date(selectedDate + 'T00:00:00');
-  const dow = baseDate.getDay(); // 0=일, 6=토
-  const weekStart = new Date(baseDate);
-  weekStart.setDate(baseDate.getDate() - dow); // 일요일 기준 주 시작
+  // 현재 표시 중인 주(miniWeekStart, 일요일 시작)를 기준으로 렌더링
+  if (!miniWeekStart) {
+    miniWeekStart = new Date(today.getFullYear(), today.getMonth(), today.getDate() - today.getDay());
+  }
+  const weekStart = new Date(miniWeekStart);
+  const baseDate  = weekStart;
 
   const grid = document.getElementById('calendar-grid');
   grid.innerHTML = '';
@@ -92,6 +105,15 @@ function renderMiniWeek() {
   document.getElementById('cal-month').textContent = baseDate.getMonth() + 1;
 }
 
+// 축소(한 줄) 상태에서 이전주/다음주 이동
+function moveMiniWeek(dir) {
+  const d = new Date(miniWeekStart);
+  d.setDate(d.getDate() + dir * 7);
+  miniWeekStart = d;
+  animateCalendar(dir, renderMiniWeek);
+  updateMonthDots();
+}
+
 function moveCalMonth(dir) {
   AppState.calMonth += dir;
   if (AppState.calMonth > 12) { AppState.calMonth = 1;  AppState.calYear++; }
@@ -100,7 +122,7 @@ function moveCalMonth(dir) {
   updateMonthDots();
 }
 
-function animateCalendar(dir) {
+function animateCalendar(dir, renderFn = renderCalendar) {
   const grid = document.getElementById('calendar-grid');
   const parent = grid.parentElement;
   const oldGrid = grid.cloneNode(true);
@@ -108,7 +130,7 @@ function animateCalendar(dir) {
   parent.style.position = 'relative';
   parent.style.overflow = 'hidden';
   parent.appendChild(oldGrid);
-  renderCalendar();
+  renderFn();
   const fromX = dir > 0 ? '100%' : '-100%';
   const toX   = dir > 0 ? '-100%' : '100%';
   grid.style.cssText = `transform:translateX(${fromX});transition:none;`;
@@ -214,8 +236,21 @@ function updateSelectedDateLabel() {
 
 async function updateMonthDots() {
   try {
-    const dates = await fetchDotDatesForMonth(AppState.calYear, AppState.calMonth);
-    const pastUndone = await fetchPastUndoneDatesForMonth(AppState.calYear, AppState.calMonth);
+    // 축소 상태: 표시 중인 주가 걸친 달(최대 2개)의 점을 합쳐서 가져옴
+    // 펼친 상태: 기존과 동일하게 현재 달만
+    const months = [[AppState.calYear, AppState.calMonth]];
+    if (calCollapsed && miniWeekStart) {
+      const ws = new Date(miniWeekStart);
+      const we = new Date(miniWeekStart); we.setDate(we.getDate() + 6);
+      months.length = 0;
+      months.push([ws.getFullYear(), ws.getMonth() + 1]);
+      if (we.getMonth() !== ws.getMonth()) months.push([we.getFullYear(), we.getMonth() + 1]);
+    }
+    let dates = [], pastUndone = [];
+    for (const [y, m] of months) {
+      dates      = dates.concat(await fetchDotDatesForMonth(y, m));
+      pastUndone = pastUndone.concat(await fetchPastUndoneDatesForMonth(y, m));
+    }
     AppState.dotDates = new Set(dates);
     AppState.pastUndoneDates = new Set(pastUndone);
     document.querySelectorAll('.cal-day').forEach(el => {
@@ -267,7 +302,10 @@ function initCalendarSwipe() {
 
   calSection.addEventListener('touchend', e => {
     const dx = e.changedTouches[0].clientX - startX;
-    if (movedH && Math.abs(dx) > 50) moveCalMonth(dx < 0 ? 1 : -1);
+    if (movedH && Math.abs(dx) > 50) {
+      if (calCollapsed) moveMiniWeek(dx < 0 ? 1 : -1);
+      else              moveCalMonth(dx < 0 ? 1 : -1);
+    }
   }, { passive: true });
 
   // PC 마우스
@@ -276,7 +314,10 @@ function initCalendarSwipe() {
   calSection.addEventListener('mouseup', e => {
     if (!mDown) return; mDown = false;
     const dx = e.clientX - mStartX;
-    if (Math.abs(dx) > 50) moveCalMonth(dx < 0 ? 1 : -1);
+    if (Math.abs(dx) > 50) {
+      if (calCollapsed) moveMiniWeek(dx < 0 ? 1 : -1);
+      else              moveCalMonth(dx < 0 ? 1 : -1);
+    }
   });
   calSection.addEventListener('mouseleave', () => { mDown = false; });
 }
