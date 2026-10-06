@@ -33,7 +33,7 @@
       display:flex; flex-direction:column; gap:14px;
     }
     #login-logo-wrap { display:flex; flex-direction:column; align-items:center; gap:10px; margin-bottom:8px; }
-    #login-logo { width:216px; height:216px; background:#1e2028; border-radius:12px; }
+    #login-logo { width:216px; height:216px; background:transparent; border-radius:12px; }
     #login-title { font-size:20px; font-weight:700; color:#e0e0e0; letter-spacing:1px; }
     #login-box input {
       width:100%; padding:13px 16px; border-radius:10px; border:1.5px solid #2e3240;
@@ -66,9 +66,17 @@
 
 <!-- 스플래시 -->
 <div id="splash-screen">
-  <img id="splash-logo" src="logo.png" alt="똑비서" />
+  <img id="splash-logo" src="logo2.png" alt="똑비서" />
   <script>
-    if (localStorage.getItem('lightmode') === '1') document.getElementById('splash-logo').src = 'logo1.png';
+    (function () {
+      // 저장된 테마를 스플래시 표시 전에 미리 적용 (배경색은 style.css의 테마별 규칙 사용)
+      var LEGACY = { sage: 'light', navy: 'dark' };
+      var COLORS = ['sky', 'rose', 'lavender', 'cream', 'apricot', 'mint', 'mocha', 'gray'];
+      var t = localStorage.getItem('app-theme') || (localStorage.getItem('lightmode') === '1' ? 'light' : 'dark');
+      if (LEGACY[t]) t = LEGACY[t];
+      if (t === 'light') document.body.classList.add('light-mode');
+      else if (COLORS.indexOf(t) !== -1) document.body.classList.add('theme-' + t, 'theme-active');
+    })();
   </script>
 </div>
 
@@ -76,7 +84,7 @@
 <div id="login-screen">
   <div id="login-box">
     <div id="login-logo-wrap">
-      <img id="login-logo" src="logo.png" alt="똑비서" />
+      <img id="login-logo" src="logo2.png" alt="똑비서" />
       <div id="login-title">똑비서</div>
     </div>
     <form id="login-form" autocomplete="off">
@@ -1099,7 +1107,7 @@ function pcPickDate(id, fromWeekly, targetDate, onSelect) {
     ['일','월','화','수','목','금','토'].forEach((d, i) => {
       const span = document.createElement('div');
       span.textContent = d;
-      span.style.cssText = `text-align:center;font-size:13px;font-weight:600;padding:4px 0;color:${i===0?'var(--danger)':i===6?'#6b9fd4':'var(--text-muted)'};`;
+      span.style.cssText = `text-align:center;font-size:13px;font-weight:600;padding:4px 0;color:${i===0?'var(--danger)':i===6?'var(--sat)':'var(--text-muted)'};`;
       wdays.appendChild(span);
     });
     popup.appendChild(wdays);
@@ -1121,7 +1129,7 @@ function pcPickDate(id, fromWeekly, targetDate, onSelect) {
       const isToday    = dateStr === todayStr2;
       const isSelected = dateStr === highlightDate;
       const dow = new Date(pickerYear, pickerMonth - 1, d).getDay();
-      const color = dow === 0 ? 'var(--danger)' : dow === 6 ? '#6b9fd4' : 'var(--text-primary)';
+      const color = dow === 0 ? 'var(--danger)' : dow === 6 ? 'var(--sat)' : 'var(--text-primary)';
       cell.style.cssText = `
         aspect-ratio:1;width:100%;border:none;cursor:pointer;border-radius:50%;
         font-size:16px;font-weight:${isToday||isSelected?'700':'400'};
