@@ -17,6 +17,7 @@
   --border:       #2a2d38;
   --border-light: #333748;
   --danger:       #e05c6a;
+  --sat:          #3d7fe0;
   --imp-1: #9e9e9e;
   --imp-2: #c8a84b;
   --imp-3: #e8732a;
@@ -82,8 +83,8 @@ ul { list-style: none; }
 .cal-thismonth-btn:hover { background: var(--accent-glow); color: var(--accent); border-color: var(--accent); }
 #calendar-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); margin-bottom: 1px; }
 .wd { text-align: center; font-size: 10px; color: var(--text-muted); padding: 1px 0; font-family: var(--font-ui); }
-.wd.sun { color: #e05c6a; }
-.wd.sat { color: #6b9fd4; }
+.wd.sun { color: var(--danger); }
+.wd.sat { color: var(--sat); }
 #calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0; }
 .cal-day {
   aspect-ratio: 1.4;
@@ -95,8 +96,8 @@ ul { list-style: none; }
 }
 .cal-day:hover { background: var(--bg-hover); }
 .cal-day.other-month { color: var(--text-muted); }
-.cal-day.sun { color: #e05c6a; }
-.cal-day.sat { color: #6b9fd4; }
+.cal-day.sun { color: var(--danger); }
+.cal-day.sat { color: var(--sat); }
 .cal-day.today { background: transparent; color: var(--accent); font-weight: 700; }
 .cal-day.selected { background: transparent; font-weight: 700; }
 .cal-day.today::before, .cal-day.selected::before {
@@ -135,7 +136,7 @@ ul { list-style: none; }
 #selected-date-bar { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; background: var(--bg-base); border-bottom: 1px solid var(--border); flex-shrink: 0; }
 #selected-date-label { font-size: 14px; font-weight: 700; font-family: var(--font-ui); }
 #selected-date-label.date-label-weekday { color: var(--text-primary); }
-#selected-date-label.date-label-sat { color: #6b9fd4; }
+#selected-date-label.date-label-sat { color: var(--sat); }
 #selected-date-label.date-label-sun { color: var(--danger); }
 
 #date-bar-actions {
@@ -417,7 +418,7 @@ ul { list-style: none; }
   font-family: var(--font-ui);
 }
 .week-day-card.sat .wdc-name,
-.week-day-card.sat .wdc-num { color: #6b9fd4; }
+.week-day-card.sat .wdc-num { color: var(--sat); }
 .week-day-card.sun .wdc-name,
 .week-day-card.sun .wdc-num { color: var(--danger); }
 
@@ -445,7 +446,7 @@ ul { list-style: none; }
   font-family: var(--font-ui);
   color: var(--text-primary);
 }
-#week-selected-label.week-sat { color: #6b9fd4; }
+#week-selected-label.week-sat { color: var(--sat); }
 #week-selected-label.week-sun { color: var(--danger); }
 
 /* 주간 할일 목록 */
@@ -490,7 +491,7 @@ ul { list-style: none; }
   border-left: 3px solid var(--accent);
 }
 .week-section-header:first-child { margin-top: 0; }
-.week-section-header.week-sat { color: #6b9fd4; border-left-color: #6b9fd4; }
+.week-section-header.week-sat { color: var(--sat); border-left-color: var(--sat); }
 .week-section-header.week-sun { color: var(--danger); border-left-color: var(--danger); }
 
 /* 달력 콜랩스 핸들 바 */
@@ -1321,6 +1322,7 @@ body.light-mode {
   --border:         #cdd0c8;
   --border-light:   #bdc1b8;
   --danger:         #c94050;
+  --sat:            #1f5fbf;
   --imp-1:          #7a7a7a;
   --imp-2:          #b08a30;
   --imp-3:          #c85820;
@@ -1433,40 +1435,20 @@ body.light-mode #logout-modal > div {
 }
 
 /* =============================================
-   5가지 컬러 테마 (배경 전체 톤이 바뀌는 독립 테마)
+   8가지 컬러 테마 (배경 전체 톤이 바뀌는 독립 테마)
    ============================================= */
 
-/* 토글 버튼: 컬러 테마 활성 시 비활성화 */
-body.theme-active #lightmode-toggle {
-  opacity: 0.3;
-  pointer-events: none;
+/* 토글 버튼: 컬러 테마 활성 시에도 켜짐(오른쪽) 상태로 표시 — 누르면 다크 모드 */
+body.theme-active .lm-toggle-track {
+  background: var(--accent-glow);
+  border-color: var(--accent);
+}
+body.theme-active .lm-toggle-thumb {
+  transform: translateX(16px);
+  background: var(--accent);
 }
 
-/* 1. 연한 녹색 (Sage) */
-body.theme-sage {
-  --bg-base:        #eef5ee;
-  --bg-surface:     #e4ede4;
-  --bg-elevated:    #d8e8d8;
-  --bg-hover:       #cce0cc;
-  --accent:         #3a8a5a;
-  --accent-dim:     #2d6e48;
-  --accent-glow:    rgba(58,138,90,0.15);
-  --text-primary:   #1a2e1a;
-  --text-secondary: #4a6a4a;
-  --text-muted:     #7a9a7a;
-  --text-done:      #aac0aa;
-  --border:         #c4d8c4;
-  --border-light:   #b0ccb0;
-  --danger:         #c84040;
-  --imp-1:          #7a8a7a;
-  --imp-2:          #8a7030;
-  --imp-3:          #a04820;
-}
-body.theme-sage #splash-screen,
-body.theme-sage #login-screen { background: #eef5ee; }
-body.theme-sage .cal-day.selected { color: #fff; }
-
-/* 2. 하늘색 (Sky) */
+/* 1. 하늘색 (Sky) */
 body.theme-sky {
   --bg-base:        #eef4fa;
   --bg-surface:     #e2ecf6;
@@ -1490,7 +1472,7 @@ body.theme-sky #splash-screen,
 body.theme-sky #login-screen { background: #eef4fa; }
 body.theme-sky .cal-day.selected { color: #fff; }
 
-/* 3. 연한 붉은색 (Rose) */
+/* 2. 연한 붉은색 (Rose) */
 body.theme-rose {
   --bg-base:        #faf0f0;
   --bg-surface:     #f4e4e4;
@@ -1514,7 +1496,7 @@ body.theme-rose #splash-screen,
 body.theme-rose #login-screen { background: #faf0f0; }
 body.theme-rose .cal-day.selected { color: #fff; }
 
-/* 4. 연한 자주색 (Lavender) */
+/* 3. 연한 자주색 (Lavender) */
 body.theme-lavender {
   --bg-base:        #f4f0fa;
   --bg-surface:     #eae4f4;
@@ -1538,23 +1520,122 @@ body.theme-lavender #splash-screen,
 body.theme-lavender #login-screen { background: #f4f0fa; }
 body.theme-lavender .cal-day.selected { color: #fff; }
 
-/* 5. 진한 청색 (Navy) */
-body.theme-navy {
-  --bg-base:        #0e1428;
-  --bg-surface:     #141c38;
-  --bg-elevated:    #1a2448;
-  --bg-hover:       #202c58;
-  --accent:         #4878e8;
-  --accent-dim:     #3060c0;
-  --accent-glow:    rgba(72,120,232,0.18);
-  --text-primary:   #d0e0f8;
-  --text-secondary: #7090c0;
-  --text-muted:     #405880;
-  --text-done:      #506070;
-  --border:         #1e2c50;
-  --border-light:   #283860;
-  --danger:         #e05060;
-  --imp-1:          #506070;
-  --imp-2:          #806020;
-  --imp-3:          #904030;
+/* 4. 연한 노란색 (Cream) */
+body.theme-cream {
+  --bg-base:        #faf7ec;
+  --bg-surface:     #f2edd8;
+  --bg-elevated:    #e9e2c8;
+  --bg-hover:       #e0d7b8;
+  --accent:         #a87a10;
+  --accent-dim:     #8a630a;
+  --accent-glow:    rgba(168,122,16,0.15);
+  --text-primary:   #2e2610;
+  --text-secondary: #6a5a30;
+  --text-muted:     #9a8a60;
+  --text-done:      #c4b890;
+  --border:         #e2d8b8;
+  --border-light:   #d6caa4;
+  --danger:         #c03838;
+  --imp-1:          #8a8270;
+  --imp-2:          #7a5a20;
+  --imp-3:          #a04820;
 }
+body.theme-cream #splash-screen,
+body.theme-cream #login-screen { background: #faf7ec; }
+body.theme-cream .cal-day.selected { color: #fff; }
+
+/* 5. 연한 주황색 (Apricot) */
+body.theme-apricot {
+  --bg-base:        #fcf2ec;
+  --bg-surface:     #f6e4d8;
+  --bg-elevated:    #f0d8c8;
+  --bg-hover:       #eaccb8;
+  --accent:         #d0682a;
+  --accent-dim:     #b0521c;
+  --accent-glow:    rgba(208,104,42,0.15);
+  --text-primary:   #301a0e;
+  --text-secondary: #7a4a30;
+  --text-muted:     #a87a60;
+  --text-done:      #d0b0a0;
+  --border:         #ecd0bc;
+  --border-light:   #e2c0aa;
+  --danger:         #b82838;
+  --imp-1:          #8a7468;
+  --imp-2:          #806028;
+  --imp-3:          #983820;
+}
+body.theme-apricot #splash-screen,
+body.theme-apricot #login-screen { background: #fcf2ec; }
+body.theme-apricot .cal-day.selected { color: #fff; }
+
+/* 6. 연한 청록색 (Mint) */
+body.theme-mint {
+  --bg-base:        #edf8f6;
+  --bg-surface:     #dcf0ec;
+  --bg-elevated:    #cfe8e3;
+  --bg-hover:       #c0e0d9;
+  --accent:         #13877d;
+  --accent-dim:     #0c6c64;
+  --accent-glow:    rgba(19,135,125,0.15);
+  --text-primary:   #0e2a28;
+  --text-secondary: #3a6a64;
+  --text-muted:     #6a9a94;
+  --text-done:      #a0c4be;
+  --border:         #bcdcd6;
+  --border-light:   #a8d0c8;
+  --danger:         #c03848;
+  --imp-1:          #6a8a86;
+  --imp-2:          #7a6828;
+  --imp-3:          #984030;
+}
+body.theme-mint #splash-screen,
+body.theme-mint #login-screen { background: #edf8f6; }
+body.theme-mint .cal-day.selected { color: #fff; }
+
+/* 7. 연한 갈색 (Mocha) */
+body.theme-mocha {
+  --bg-base:        #f6f0e9;
+  --bg-surface:     #ece2d6;
+  --bg-elevated:    #e3d6c6;
+  --bg-hover:       #d9cab8;
+  --accent:         #8a5a34;
+  --accent-dim:     #704626;
+  --accent-glow:    rgba(138,90,52,0.15);
+  --text-primary:   #2a1c10;
+  --text-secondary: #6a5040;
+  --text-muted:     #9a8070;
+  --text-done:      #c4b0a0;
+  --border:         #ddcdb9;
+  --border-light:   #d0bea8;
+  --danger:         #b83838;
+  --imp-1:          #857868;
+  --imp-2:          #7a6028;
+  --imp-3:          #984020;
+}
+body.theme-mocha #splash-screen,
+body.theme-mocha #login-screen { background: #f6f0e9; }
+body.theme-mocha .cal-day.selected { color: #fff; }
+
+/* 8. 연한 회색 (Gray) */
+body.theme-gray {
+  --bg-base:        #f3f4f6;
+  --bg-surface:     #e7e9ec;
+  --bg-elevated:    #dcdfe3;
+  --bg-hover:       #d0d4da;
+  --accent:         #4a5568;
+  --accent-dim:     #384150;
+  --accent-glow:    rgba(74,85,104,0.15);
+  --text-primary:   #1a1e26;
+  --text-secondary: #555d6b;
+  --text-muted:     #868d9a;
+  --text-done:      #b0b5be;
+  --border:         #cfd3d9;
+  --border-light:   #bfc4cc;
+  --danger:         #c03848;
+  --imp-1:          #7a7e86;
+  --imp-2:          #806428;
+  --imp-3:          #984030;
+}
+body.theme-gray #splash-screen,
+body.theme-gray #login-screen { background: #f3f4f6; }
+body.theme-gray .cal-day.selected { color: #fff; }
