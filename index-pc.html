@@ -422,6 +422,10 @@
 
   </div>
 
+  <!-- ── 구분선 드래그 핸들 (위치는 style-pc.css의 CSS 변수로 계산) ── -->
+  <div id="pc-resizer-left"  class="pc-resizer" role="separator" aria-orientation="vertical" aria-label="달력 영역 너비 조절" tabindex="0" title="드래그: 너비 조절 / 더블클릭: 기본값"></div>
+  <div id="pc-resizer-right" class="pc-resizer" role="separator" aria-orientation="vertical" aria-label="세부내역 영역 너비 조절" tabindex="0" title="드래그: 너비 조절 / 더블클릭: 기본값"></div>
+
 </div><!-- /app -->
 
 <!-- ===== 설정 패널 ===== -->
@@ -1206,6 +1210,115 @@ function pcPickDate(id, fromWeekly, targetDate, onSelect) {
     } catch(e) {}
   }
   document.addEventListener('DOMContentLoaded', () => { setTimeout(fetchWeather, 1500); });
+})();
+</script>
+<script>
+/* ── 구분선 드래그로 3분할 너비 조절 ──
+   우선순위: 가운데(할일목록) > 좌측(달력) > 우측(세부내역)
+   창이 좁아지면 우측부터 줄이고, 그다음 좌측을 줄임.
+   조절한 너비는 사용하는 동안에만 유지(저장 안 함) → 다시 접속하면 기본 크기.
+   창을 다시 넓히면 조절해둔 너비로 복귀. 더블클릭 = 기본값. */
+(function () {
+  const MIN   = { L: 260, C: 320, R: 220 };  // 1차 최소폭
+  const FLOOR = { L: 240, R: 180 };          // 아주 좁을 때 2차 최소폭
+  const root  = document.documentElement;
+  const hL = document.getElementById('pc-resizer-left');
+  const hR = document.getElementById('pc-resizer-right');
+  if (!hL || !hR) return;
+
+  // 이전 버전에서 저장해둔 너비 값 정리
+  try { localStorage.removeItem('pc-pane-left'); localStorage.removeItem('pc-pane-right'); } catch (e) {}
+
+  const pref = { L: null, R: null };   // null = 기본값(창 크기에 따라 자동). 메모리에만 보관
+  const cur  = { l: 0, r: 0 };                       // 실제 적용 중인 값
+
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const winW  = () => root.clientWidth || window.innerWidth;
+
+  // 기본값: 기존 레이아웃과 같은 비율
+  function wantL(W) { return pref.L != null ? pref.L : clamp(W * 0.3714, 364, 520); }
+  function wantR(W, l) { return pref.R != null ? pref.R : clamp((W - l) / 2.4, 240, 600); }
+
+  // 공간이 부족하면 우측 → 좌측 → 우측(2차) → 좌측(2차) 순으로 줄임
+  function fit(W) {
+    let l = Math.max(wantL(W), MIN.L);
+    let r = Math.max(wantR(W, l), MIN.R);
+    let over = l + r + MIN.C - W, d;
+    if (over > 0) { d = Math.min(over, r - MIN.R);   r -= d; over -= d; }
+    if (over > 0) { d = Math.min(over, l - MIN.L);   l -= d; over -= d; }
+    if (over > 0) { d = Math.min(over, r - FLOOR.R); r -= d; over -= d; }
+    if (over > 0) { d = Math.min(over, l - FLOOR.L); l -= d; }
+    return { l: Math.round(l), r: Math.round(r) };
+  }
+
+  function apply() {
+    const f = fit(winW());
+    cur.l = f.l; cur.r = f.r;
+    root.style.setProperty('--pc-left-w',  f.l + 'px');
+    root.style.setProperty('--pc-right-w', f.r + 'px');
+  }
+
+  // 드래그 값 → 선호값 (가운데 최소폭을 침범하지 않게)
+  function setLeft(v)  { const W = winW(); pref.L = clamp(v, MIN.L, Math.max(MIN.L, W - cur.r - MIN.C)); apply(); }
+  function setRight(v) { const W = winW(); pref.R = clamp(v, MIN.R, Math.max(MIN.R, W - cur.l - MIN.C)); apply(); }
+
+  function bindDrag(handle, side) {
+    let raf = 0, lastX = 0;
+    handle.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      handle.setPointerCapture(e.pointerId);
+      // 반대쪽 패널은 현재 너비로 고정 → 드래그한 만큼 가운데만 늘고 줄어듦
+      if (side === 'L' && pref.R == null) pref.R = cur.r;
+      if (side === 'R' && pref.L == null) pref.L = cur.l;
+      handle.classList.add('active');
+      document.body.classList.add('pc-resizing');
+    });
+    handle.addEventListener('pointermove', (e) => {
+      if (!handle.hasPointerCapture(e.pointerId)) return;
+      lastX = e.clientX;
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        if (side === 'L') setLeft(lastX);
+        else setRight(winW() - lastX);
+      });
+    });
+    const end = (e) => {
+      if (!handle.classList.contains('active')) return;
+      try { handle.releasePointerCapture(e.pointerId); } catch (_) {}
+      handle.classList.remove('active');
+      document.body.classList.remove('pc-resizing');
+    };
+    handle.addEventListener('pointerup', end);
+    handle.addEventListener('pointercancel', end);
+
+    // 더블클릭: 이 구분선만 기본값으로
+    handle.addEventListener('dblclick', () => {
+      if (side === 'L') pref.L = null;
+      else              pref.R = null;
+      apply();
+    });
+
+    // 키보드: ←/→ 16px, Shift 누르면 64px
+    handle.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault();
+      const step = (e.shiftKey ? 64 : 16) * (e.key === 'ArrowRight' ? 1 : -1);
+      if (side === 'L') setLeft(cur.l + step);
+      else              setRight(cur.r - step);
+    });
+  }
+
+  bindDrag(hL, 'L');
+  bindDrag(hR, 'R');
+
+  let rz = 0;
+  window.addEventListener('resize', () => {
+    if (rz) return;
+    rz = requestAnimationFrame(() => { rz = 0; apply(); });
+  });
+  apply();
 })();
 </script>
 </body>
