@@ -7,6 +7,8 @@
 :root {
   /* 풀화면(1400px)→520px, 절반(700px)→364px(30%감소), 이하 364px 유지 */
   --pc-left-w: clamp(364px, 37.14vw, 520px);
+  /* 우측 폭: JS(구분선 조절)가 실제 값으로 덮어씀. 아래는 JS 로드 전 기본값 */
+  --pc-right-w: clamp(240px, calc((100vw - var(--pc-left-w)) / 2.4), 600px);
 }
 
 /* ── #app: 좌측 동적, 중앙 흡수, 우측 최솟값 보장 ── */
@@ -14,7 +16,7 @@
   max-width: none !important;
   height: 100dvh !important;
   display: grid !important;
-  grid-template-columns: var(--pc-left-w) 1.4fr minmax(240px, 1fr) !important;
+  grid-template-columns: var(--pc-left-w) minmax(0, 1fr) var(--pc-right-w) !important;
   grid-template-rows: 100dvh !important;
   overflow: hidden !important;
   border-left: none !important;
@@ -42,6 +44,7 @@
   flex-direction: column;
   overflow: hidden;
   z-index: 5;
+  container-type: inline-size;  /* 달력 크기를 좌측 패널 폭 기준(cqw)으로 */
 }
 
 /* ── 가로 탭: 한 줄 ── */
@@ -107,14 +110,14 @@
 /* 달력 셀: 폰트 동적 크기 (풀화면 22px, 절반 화면 ~14px) */
 #pc-left .cal-day {
   aspect-ratio: unset !important;
-  font-size: clamp(14px, 1.6vw, 22px);
+  font-size: clamp(14px, 4.3cqw, 22px);
 }
 
 /* 달력 today/selected 원 크기: 동적 */
 #pc-left .cal-day.today::before,
 #pc-left .cal-day.selected::before {
-  width:  clamp(28px, 2.9vw, 40px);
-  height: clamp(28px, 2.9vw, 40px);
+  width:  clamp(28px, 7.8cqw, 40px);
+  height: clamp(28px, 7.8cqw, 40px);
 }
 
 
@@ -396,3 +399,45 @@ body.pc-layout #repeats-panel    { width: var(--pc-left-w); }
 
 /* action-popup: PC에서 드롭다운으로 대체 */
 body.pc-layout #action-popup { display: none !important; }
+
+/* =============================================
+   구분선 드래그 핸들 (좌↔중앙, 중앙↔우측)
+   - 위치는 CSS 변수만으로 계산, JS는 변수 값만 갱신
+   - 더블클릭: 해당 구분선 기본값 복원
+   ============================================= */
+.pc-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 9px;
+  z-index: 30;
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+}
+#pc-resizer-left  { left:  calc(var(--pc-left-w)  - 5px); }
+#pc-resizer-right { right: calc(var(--pc-right-w) - 4px); }
+
+/* 가운데 표시선: 평소엔 숨김, 호버/드래그/포커스 시 강조색 */
+.pc-resizer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.pc-resizer:hover::after,
+.pc-resizer:focus-visible::after,
+.pc-resizer.active::after { opacity: 0.85; }
+
+/* 드래그 중: 전체 커서 고정, 텍스트 선택 방지 */
+body.pc-resizing,
+body.pc-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
