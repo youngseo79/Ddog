@@ -964,6 +964,30 @@ document.addEventListener('input', e => {
 
 })();
 
+/* ── PC: 할일창(A)에 종속된 하단 창(B: 반복/리스트/반복수정)을 함께 닫기 ──
+   — A를 닫을 때, 할일 클릭/추가로 A를 새로 띄울 때 B를 먼저 닫음
+   — 확인하지 않은 B의 편집 내용은 각 창의 '취소'와 동일하게 처리(저장 안 함) */
+(function() {
+  function pcCloseSubPanels() {
+    const isOpen = id => {
+      const el = document.getElementById(id);
+      return el && !el.classList.contains('hidden');
+    };
+    if (isOpen('repeat-edit-overlay')) closeRepeatEditOverlay();
+    if (isOpen('repeat-overlay'))      closeRepeatModal();
+    if (isOpen('checklist-overlay'))   closeChecklistModal(false);
+  }
+  const _wrapWithSubClose = function(orig) {
+    return function(...args) {
+      pcCloseSubPanels();
+      return orig(...args);
+    };
+  };
+  if (window.closeModal)    window.closeModal    = _wrapWithSubClose(window.closeModal);
+  if (window.openEditModal) window.openEditModal = _wrapWithSubClose(window.openEditModal);
+  if (window.openAddModal)  window.openAddModal  = _wrapWithSubClose(window.openAddModal);
+})();
+
 (function() {
   const _orig = window.openActionPopup;
   window.openActionPopup = function(id, fromWeekly, targetDate, todo) {
