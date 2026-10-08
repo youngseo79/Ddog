@@ -94,6 +94,9 @@ function initGesturePopup() {
     } else {
       const fromWeekly = actionFromWeekly;
       try {
+        // 원본에 연결된 상기 사본(🔔)도 함께 삭제
+        try { await deleteRemindCopies(actionTargetId); }
+        catch(e) { console.warn('[gesture] 상기 사본 삭제 실패:', e); }
         await deleteTodo(actionTargetId);
         AppState.todos = AppState.todos.filter(t => t.id !== actionTargetId);
         closeActionPopup();

@@ -57,12 +57,13 @@ function toggleCalendar() {
     section.classList.add('collapsed');
     // 아이콘 → 아래 화살표
     icon.innerHTML = '<polyline points="6 9 12 15 18 9"></polyline>';
-    // 축소 시: 항상 이번주 표시 + 오늘로 자동 선택
-    const today = new Date();
-    miniWeekStart = new Date(today.getFullYear(), today.getMonth(), today.getDate() - today.getDay());
-    AppState.calYear  = today.getFullYear();
-    AppState.calMonth = today.getMonth() + 1;
-    selectDate(toLocalDateStr(today)); // 내부에서 renderMiniWeek + 라벨 + loadTodos
+    // 축소 시: 선택된 날짜가 포함된 주 표시 (선택된 날짜가 없으면 오늘 기준)
+    const baseStr = AppState.selectedDate || toLocalDateStr(new Date());
+    const base = new Date(baseStr + 'T00:00:00');
+    miniWeekStart = new Date(base.getFullYear(), base.getMonth(), base.getDate() - base.getDay());
+    AppState.calYear  = base.getFullYear();
+    AppState.calMonth = base.getMonth() + 1;
+    selectDate(baseStr); // 내부에서 renderMiniWeek + 라벨 + loadTodos
     updateMonthDots();
   } else {
     section.classList.remove('collapsed');
@@ -101,8 +102,13 @@ function renderMiniWeek() {
   }
 
   // 헤더 년/월 표시 업데이트
-  document.getElementById('cal-year').textContent  = baseDate.getFullYear();
-  document.getElementById('cal-month').textContent = baseDate.getMonth() + 1;
+  // 표시 중인 주에 선택된 날짜가 있으면 선택된 날짜 기준, 없으면 주의 시작일(일요일) 기준
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+  const selD = selectedDate ? new Date(selectedDate + 'T00:00:00') : null;
+  const headerDate = (selD && selD >= weekStart && selD <= weekEnd) ? selD : baseDate;
+  document.getElementById('cal-year').textContent  = headerDate.getFullYear();
+  document.getElementById('cal-month').textContent = headerDate.getMonth() + 1;
 }
 
 // 축소(한 줄) 상태에서 이전주/다음주 이동

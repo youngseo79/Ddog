@@ -185,6 +185,14 @@ function openEditModal(todo) {
     }
   }
 
+  // ── 상기 사본(🔔) 편집 시: 상기 입력 잠금 (사본의 사본 생성 방지) ──
+  if (todo.remind_source_id) {
+    const remindInput = document.getElementById('input-remind');
+    remindInput.value = 0;
+    remindInput.disabled = true;
+    remindInput.style.opacity = '0.4';
+  }
+
   document.getElementById('modal-overlay').classList.remove('hidden');
 }
 
@@ -200,6 +208,8 @@ function resetModalForm() {
   document.getElementById('input-memo').value   = '';
   document.getElementById('input-date').value   = getDefaultDate();
   document.getElementById('input-remind').value = 0;
+  document.getElementById('input-remind').disabled = false;      // 상기 사본 잠금 해제
+  document.getElementById('input-remind').style.opacity = '';
   document.getElementById('input-weekly-flag').checked = false;
   document.getElementById('detail-toggle').checked = false;
   document.getElementById('detail-section').classList.add('hidden');
@@ -827,12 +837,25 @@ async function handleSave() {
       }
 
       // 일반 할일 수정
+      const beforeTodo = editingTodo || null;
       await updateTodo(AppState.editingId, data);
       const idx = AppState.todos.findIndex(t => t.id === AppState.editingId);
       if (idx !== -1) AppState.todos[idx] = { ...AppState.todos[idx], ...data };
+
+      // 상기 사본 연동 (생성/변경/삭제). 실패해도 원본 수정은 이미 완료된 상태.
+      let remindFailed = false;
+      if (beforeTodo) {
+        try {
+          await syncRemindCopy({ ...beforeTodo, id: AppState.editingId }, { ...beforeTodo, ...data });
+        } catch(e) {
+          remindFailed = true;
+          console.error('[modal] 상기 사본 처리 실패:', e);
+        }
+      }
+
       closeModal();
       refreshCurrentTab();
-      showToast('수정됐어요 ✓');
+      showToast(remindFailed ? '수정됐어요 (상기 반영 실패)' : '수정됐어요 ✓');
     } else {
       // 신규 추가
       const newTodo = await insertTodo(data);

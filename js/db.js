@@ -310,12 +310,17 @@ async function insertRemindCopy(original, remindDate, dateLabel) {
     remind_days: 0,
     is_done:     false,
     sort_order:  0,
+    remind_source_id: (original && original.id != null) ? String(original.id) : null,  // 원본 연결
     created_at:  now,
     updated_at:  now,
     user_id:     getCurrentUserId(),
   };
 
-  if (AppState.isOnline) {
+  // 원본이 아직 서버에 없는 tmp 행이면 사본도 큐로 보냄
+  // (큐는 순서대로 전송되므로 원본이 먼저 올라가고, 사본의 원본 id가 진짜 id로 교체된 뒤 전송됨)
+  const sourceIsTmp = String(payload.remind_source_id || '').startsWith('tmp_');
+
+  if (AppState.isOnline && !sourceIsTmp) {
     try {
       const res = await fetch(`${DB.url}/rest/v1/${TABLE_NAME}`, {
         method: 'POST',
@@ -335,6 +340,80 @@ async function insertRemindCopy(original, remindDate, dateLabel) {
   await idbPut(localTodo);
   await queuePush({ path: TABLE_NAME, method: 'POST', body: payload, tmpId: tempId });
   return localTodo;
+}
+
+// ── 상기 사본 연동 ──
+// 원본(remind_days > 0)과 사본(remind_source_id = 원본 id)을 연결해서 관리한다.
+// 연결 정보가 없는 예전 사본은 대상이 아님.
+
+// 원본 id로 연결된 사본 찾기 (tmp id ↔ 진짜 id 양쪽 모두 고려)
+async function findRemindCopies(sourceId) {
+  if (sourceId == null) return [];
+  const ids = new Set([String(sourceId), String(resolveTmpId(sourceId))]);
+  if (typeof _tmpIdMap !== 'undefined') {
+    for (const [tmp, real] of _tmpIdMap) {
+      if (ids.has(String(real))) ids.add(String(tmp));
+    }
+  }
+  const all = await idbGetAll();
+  return all.filter(t => t.remind_source_id != null && ids.has(String(t.remind_source_id)));
+}
+
+// 원본에 연결된 사본 모두 삭제
+async function deleteRemindCopies(sourceId) {
+  const copies = await findRemindCopies(sourceId);
+  for (const c of copies) await deleteTodo(c.id);
+}
+
+// 원본 수정 후 사본 동기화
+//  before: 수정 전 원본, after: 수정 후 원본({...before, ...변경내용})
+//  - 상기 0 → N : 사본 생성
+//  - 상기 N → M, 날짜/제목/메모/중요도 변경 : 사본 갱신
+//  - 상기 → 0  : 사본 삭제
+async function syncRemindCopy(before, after) {
+  if (!before || before.id == null) return;
+  if (before.remind_source_id) return;            // 사본 자체는 대상 아님
+
+  const oldRemind = before.remind_days || 0;
+  const newRemind = after.storage_flag ? 0 : (after.remind_days || 0);
+  const copies = await findRemindCopies(before.id);
+
+  // 상기 해제 → 사본 삭제
+  if (newRemind <= 0) {
+    for (const c of copies) await deleteTodo(c.id);
+    return;
+  }
+
+  const remindDate = daysBeforeStr(after.date, newRemind);
+  const d = new Date(after.date + 'T00:00:00');
+  const dateLabel = `${d.getMonth()+1}월 ${d.getDate()}일`;
+
+  // 연결된 사본 없음 → 상기 숫자가 바뀐 경우에만 새로 생성
+  //   (숫자 변화 없이 사본이 없다면 사용자가 직접 지운 것이므로 다시 만들지 않음)
+  if (copies.length === 0) {
+    if (oldRemind !== newRemind) {
+      await insertRemindCopy({ ...after, id: before.id }, remindDate, dateLabel);
+    }
+    return;
+  }
+
+  const changed =
+    oldRemind !== newRemind ||
+    (before.date || '')  !== (after.date || '') ||
+    (before.title || '') !== (after.title || '') ||
+    (before.memo || '')  !== (after.memo || '') ||
+    (before.importance || 0) !== (after.importance || 0);
+  if (!changed) return;
+
+  const [first, ...extra] = copies;
+  await updateTodo(first.id, {
+    title:      `🔔 ${after.title}(${dateLabel})`,
+    memo:       after.memo || '',
+    importance: after.importance,
+    date:       remindDate,
+  });
+  // 혹시 중복 사본이 있으면 정리
+  for (const c of extra) await deleteTodo(c.id);
 }
 
 // ── UPDATE ──
@@ -370,7 +449,15 @@ async function toggleDone(id, isDone) {
 }
 
 async function moveTodoDate(id, newDate) {
-  return updateTodo(id, { date: newDate, sort_order: 0 });
+  let before = null;
+  try { before = await idbGet(resolveTmpId(id)); } catch(e) {}
+  const result = await updateTodo(id, { date: newDate, sort_order: 0 });
+  // 상기 사본이 연결된 원본이면 사본 날짜도 함께 이동
+  if (before && (before.remind_days || 0) > 0) {
+    try { await syncRemindCopy(before, { ...before, date: newDate }); }
+    catch(e) { console.warn('[db] 상기 사본 이동 실패:', e); }
+  }
+  return result;
 }
 
 // ── 창고 항목을 일반 할일로 전환 ──

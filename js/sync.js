@@ -392,6 +392,9 @@ async function _flushPost(op) {
       if (o.body && o.body.repeat_master_id === tmpId) {
         o.body = { ...o.body, repeat_master_id: real.id }; touched = true;
       }
+      if (o.body && o.body.remind_source_id === tmpId) {
+        o.body = { ...o.body, remind_source_id: String(real.id) }; touched = true;
+      }
       if (o.path && o.path.includes(tmpId)) {
         o.path = o.path.replace(tmpId, real.id); touched = true;
       }
@@ -403,6 +406,12 @@ async function _flushPost(op) {
       .filter(r => r.repeat_master_id === tmpId)
       .map(r => ({ ...r, repeat_master_id: real.id }));
     if (refs.length) await idbPutMany(refs);
+
+    // 상기 사본의 원본 id(tmp)도 진짜 id로 교체
+    const remindRefs = local
+      .filter(r => r.remind_source_id === tmpId)
+      .map(r => ({ ...r, remind_source_id: String(real.id) }));
+    if (remindRefs.length) await idbPutMany(remindRefs);
   }
 
   return true;
