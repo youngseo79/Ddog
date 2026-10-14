@@ -67,7 +67,12 @@ function renderTodos() {
   initDragSort();
 }
 
-// 활성 할일 정렬: 반복일정 최상단(나중 추가순) → 중요도 높은순 → sort_order
+// 반복일정 이름 비교용: 숫자는 크기대로(2 → 10), 영문·숫자 먼저, 한글 뒤
+const _repeatTitleCollator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
+
+// 활성 할일 정렬: 반복일정 최상단 → 중요도 높은순 → sort_order
+// 반복일정 내부: 체크리스트 있는 것 위(전체 항목 수 많은 순 → 이름 오름차순)
+//               → 체크리스트 없는 것(이름 오름차순)
 // ※ 반복 판정에 repeat_master_id를 포함 → 예외 행(repeat_type='none', repeat_master_id 있음)도
 //   반복 그룹으로 간주되어 항상 최상단에 위치 (중요도 높음보다도 위)
 function sortActiveTodos(todos) {
@@ -76,8 +81,11 @@ function sortActiveTodos(todos) {
     const bIsRepeat = !!(b.repeat_type && b.repeat_type !== 'none') || !!b.repeat_master_id;
     if (aIsRepeat !== bIsRepeat) return aIsRepeat ? -1 : 1;
     if (aIsRepeat && bIsRepeat) {
-      // 둘 다 반복: 나중에 추가한 것이 위 (created_at 내림차순)
-      return (b.created_at || '') > (a.created_at || '') ? 1 : -1;
+      const aCount = getChecklistProgress(a)?.total || 0;
+      const bCount = getChecklistProgress(b)?.total || 0;
+      if ((aCount > 0) !== (bCount > 0)) return aCount > 0 ? -1 : 1;
+      if (aCount !== bCount) return bCount - aCount;
+      return _repeatTitleCollator.compare(a.title || '', b.title || '');
     }
     if (b.importance !== a.importance) return b.importance - a.importance;
     return a.sort_order - b.sort_order;
@@ -88,6 +96,8 @@ function makeTodoItem(todo) {
   const li = document.createElement('li');
   li.className = 'todo-item' + (todo.is_done ? ' done' : '');
   li.dataset.id = todo.id;
+  // 반복일정 표시 → 드래그 비활성 판단용
+  if ((todo.repeat_type && todo.repeat_type !== 'none') || todo.repeat_master_id) li.dataset.repeat = '1';
 
   // 중요도 바 (반복 일정이면 빨간선 + 별) — 예외 행(repeat_master_id 있음)도 반복 표시 유지
   const impBar = document.createElement('div');
@@ -254,6 +264,8 @@ function initDragSort() {
   items.forEach(item => {
     const handle = item.querySelector('[data-drag-handle]');
     if (!handle) return;
+    // 반복일정은 핸들만 표시하고 드래그는 비활성
+    if (item.dataset.repeat === '1') { handle.style.cursor = 'default'; return; }
 
     // 터치 드래그
     handle.addEventListener('touchstart', onTouchDragStart, { passive: false });
