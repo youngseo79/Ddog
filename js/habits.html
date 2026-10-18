@@ -586,13 +586,13 @@ function toggleLog(habitId, dateS) {
   const h = habitDefs.find(d => d.habit_id===habitId); if (!h) return;
   const k = logKey(habitId, dateS);
   const cur = habitLogs[k]; const curMissed = !!(cur && cur.missed); const curVal = cur ? (cur.value||0) : 0;
-  // state machine: none -> missed(X) -> progress steps... -> none
+  // state machine: none -> progress steps(V)... -> missed(X) -> none
   let next; // {none:true} | {missed:true} | {value:n}
-  if (!cur) { next = {missed:true}; }
-  else if (curMissed) { next = {value: h.goal_type==='daily_amount' ? 25 : 1}; }
-  else if (h.goal_type==='daily_count') { next = curVal>=h.goal_value ? {none:true} : {value:curVal+1}; }
-  else if (h.goal_type==='daily_amount') { const steps=[25,50,75,100]; const i=steps.indexOf(curVal); next = (i<0||i>=steps.length-1) ? {none:true} : {value:steps[i+1]}; }
-  else { next = {none:true}; } // weekly: value(1) -> none
+  if (!cur) { next = {value: h.goal_type==='daily_amount' ? 25 : 1}; }
+  else if (curMissed) { next = {none:true}; }
+  else if (h.goal_type==='daily_count') { next = curVal>=h.goal_value ? {missed:true} : {value:curVal+1}; }
+  else if (h.goal_type==='daily_amount') { const steps=[25,50,75,100]; const i=steps.indexOf(curVal); next = (i<0||i>=steps.length-1) ? {missed:true} : {value:steps[i+1]}; }
+  else { next = {missed:true}; } // weekly: value(1) -> missed
   const logs = loadLogs();
   if (next.none) { delete logs[k]; }
   else if (next.missed) { logs[k]={value:0, missed:true, ts:new Date().toISOString()}; }
