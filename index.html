@@ -407,11 +407,22 @@
         <input type="number" id="input-remind" placeholder="0" min="0" max="30" value="0" />
         <span class="detail-unit">일 전</span>
         <button id="repeat-btn" class="repeat-btn" title="반복 설정">🔁 반복</button>
-        <label id="checklist-toggle-label">
-          <input type="checkbox" id="checklist-toggle" />
-          <span>리스트</span>
-        </label>
-        <button id="checklist-open-btn" class="checklist-open-btn hidden" title="체크리스트 편집">☑ 리스트</button>
+        <div id="remind-flags-column">
+          <div class="remind-flag-slot">
+            <label id="checklist-toggle-label">
+              <input type="checkbox" id="checklist-toggle" />
+              <span>리스트</span>
+            </label>
+            <button id="checklist-open-btn" class="checklist-open-btn hidden" title="체크리스트 편집">☑ 리스트</button>
+          </div>
+          <div class="remind-flag-slot">
+            <label id="time-toggle-label">
+              <input type="checkbox" id="time-toggle" />
+              <span>시간</span>
+            </label>
+            <button id="time-open-btn" class="time-open-btn hidden" title="시간 편집">🕒 시간</button>
+          </div>
+        </div>
       </div>
     </div>
     <button id="modal-save">저장</button>
@@ -557,6 +568,27 @@
     <div id="checklist-footer">
       <button id="checklist-cancel-btn" class="checklist-footer-btn cancel">취소</button>
       <button id="checklist-confirm-btn" class="checklist-footer-btn confirm">확인</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 시간 설정 모달 ===== -->
+<div id="time-overlay" class="hidden">
+  <div id="time-box">
+    <div id="time-header">
+      <span>시간 설정</span>
+      <button id="time-modal-close">✕</button>
+    </div>
+    <div id="time-select-row">
+      <select id="time-hour"></select>
+      <span class="time-unit">시</span>
+      <select id="time-minute"></select>
+      <span class="time-unit">분</span>
+    </div>
+    <div id="time-footer">
+      <button id="time-delete-btn" class="time-footer-btn delete hidden">삭제</button>
+      <button id="time-cancel-btn" class="time-footer-btn cancel">취소</button>
+      <button id="time-confirm-btn" class="time-footer-btn confirm">확인</button>
     </div>
   </div>
 </div>
