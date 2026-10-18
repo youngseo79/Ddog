@@ -21,6 +21,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // 앱 전체 초기화 (로그인 성공 후 또는 세션 복원 후 호출)
 async function bootApp() {
+  // 시간 일정 팝업용 데이터: 앱 시작과 동시에 서버에 직접 요청 (전체 동기화와 병렬)
+  const timedServerPromise = fetchTimedTodosFromServer();
+
   await initSync();
   initCalendar();
   initModal();
@@ -36,11 +39,137 @@ async function bootApp() {
   loadTodos();
   initBackButton();
 
+  // ── 첫 접속 시 오늘의 시간 일정 팝업 ──
+  // 스플래시가 걷히기 전에 팝업을 미리 깔아둠 → 스플래시가 사라지면 바로 팝업이 보임
+  // (bootApp이 끝나야 스플래시가 사라지므로, 서버 응답을 최대 3초까지 기다림)
+  // (앱 새로 열기/새로고침 때만 실행. 날짜 이동·백그라운드 복귀 시에는 실행 안 됨)
+  try {
+    const timed = await buildTimedTodosForPopup(timedServerPromise);
+    showTimedTodosPopup(timed);
+  } catch(e) {
+    console.warn('[app] 시간 일정 팝업 실패', e);
+  }
+
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       document.getElementById('date-bar-actions').style.visibility = 'visible';
     });
   });
+}
+
+// ── 오늘의 시간 일정 조회 (팝업용) ──
+// 서버에 "오늘 + 시간 있음 + 미완료"만 직접 요청 → 다른 기기 변경분까지 즉시 반영
+// + 아직 서버로 안 올라간 이 기기의 변경분(tmp 행, 더 최신인 로컬 수정)은 기기 데이터로 보완
+// 오프라인/실패/3초 초과 시 기기 데이터만으로 진행
+// 1) 서버 조회 (bootApp 시작과 동시에 출발, 실패/3초 초과 시 null)
+async function fetchTimedTodosFromServer() {
+  if (!AppState.isOnline) return null;
+  const today = toLocalDateStr(new Date());
+  try {
+    const path = `${TABLE_NAME}?date=eq.${today}&time_at=not.is.null&is_done=eq.false`;
+    return await Promise.race([
+      sbFetch(path, { signal: _timeoutSignal(3000) }),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 3000)),
+    ]);
+  } catch(e) {
+    console.warn('[app] 시간 일정 서버 조회 실패 → 기기 데이터 사용', e);
+    return null;
+  }
+}
+
+// 2) 서버 결과 + 기기 데이터 합치기 (initSync 이후 호출 → IDB 준비 완료 상태)
+async function buildTimedTodosForPopup(serverPromise) {
+  const today = toLocalDateStr(new Date());
+  const isTimedUndone = t => t && t.time_at && !t.is_done && !t.storage_flag && t.date === today;
+
+  const serverRows = await serverPromise;
+
+  let localRows = [];
+  try {
+    localRows = await fetchTodosByDate(today);
+  } catch(e) {}
+
+  let result;
+  if (Array.isArray(serverRows)) {
+    const localMap = new Map(localRows.map(t => [String(t.id), t]));
+    const toTime = v => (v ? (Date.parse(v) || 0) : 0);
+    const merged = new Map();
+    // 서버 행 기준. 단, 기기에 더 최신 수정(아직 미전송)이 있으면 기기 것을 사용
+    serverRows.forEach(r => {
+      const local = localMap.get(String(r.id));
+      const use = (local && toTime(local.updated_at) > toTime(r.updated_at)) ? local : r;
+      merged.set(String(r.id), use);
+    });
+    // 서버에 아직 없는 이 기기의 새 할일(tmp 행)
+    localRows.forEach(t => {
+      if (String(t.id).startsWith('tmp_')) merged.set(String(t.id), t);
+    });
+    result = [...merged.values()];
+  } else {
+    result = localRows;
+  }
+
+  return result
+    .filter(isTimedUndone)
+    .sort((a, b) => (a.time_at < b.time_at ? -1 : a.time_at > b.time_at ? 1 : 0));
+}
+
+// ── 오늘의 시간 일정 팝업 (상기용, 확인 버튼만) ──
+// 뒤 배경은 불투명 → 확인을 눌러야 할일 화면이 보임
+function showTimedTodosPopup(timed) {
+  try {
+    if (document.getElementById('timed-todos-overlay')) return;
+    if (!timed || timed.length === 0) return;   // 시간 일정 없으면 띄우지 않음
+
+    const overlay = document.createElement('div');
+    overlay.id = 'timed-todos-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:var(--bg-base);z-index:1300;' +
+      'display:flex;align-items:center;justify-content:center;';
+
+    const box = document.createElement('div');
+    box.style.cssText = 'background:var(--bg-elevated);border-radius:16px;padding:24px 22px 20px;' +
+      'width:320px;max-width:calc(100vw - 40px);max-height:80vh;display:flex;flex-direction:column;gap:16px;' +
+      'box-shadow:0 8px 32px rgba(0,0,0,0.5);border:1px solid var(--border-light);font-family:var(--font-main);';
+
+    const title = document.createElement('div');
+    title.style.cssText = 'font-size:16px;font-weight:600;color:var(--text-primary);text-align:center;';
+    title.textContent = '🕒 오늘의 시간 일정';
+
+    const list = document.createElement('div');
+    list.style.cssText = 'display:flex;flex-direction:column;gap:8px;overflow-y:auto;';
+    timed.forEach(t => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;gap:8px;align-items:baseline;padding:10px 12px;border-radius:10px;' +
+        'background:var(--bg-surface);font-size:14px;color:var(--text-primary);line-height:1.4;';
+      const tm = document.createElement('span');
+      tm.style.cssText = 'color:var(--accent);font-weight:600;white-space:nowrap;font-family:var(--font-ui);';
+      tm.textContent = `[${formatTimeLabel(t.time_at)}]`;
+      const tt = document.createElement('span');
+      tt.style.cssText = 'word-break:break-all;';
+      tt.textContent = t.title || '';
+      row.appendChild(tm);
+      row.appendChild(tt);
+      list.appendChild(row);
+    });
+
+    const okBtn = document.createElement('button');
+    okBtn.style.cssText = 'width:100%;padding:12px;border-radius:10px;border:none;background:var(--accent);' +
+      'color:#1a1a2e;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;flex-shrink:0;';
+    okBtn.textContent = '확인';
+    okBtn.addEventListener('click', closeTimedTodosPopup);
+
+    box.appendChild(title);
+    box.appendChild(list);
+    box.appendChild(okBtn);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+  } catch(e) {
+    console.warn('[app] 시간 일정 팝업 실패', e);
+  }
+}
+
+function closeTimedTodosPopup() {
+  document.getElementById('timed-todos-overlay')?.remove();
 }
 
 // ── 라이트 모드 토글 ──
@@ -97,6 +226,7 @@ function initBackButton() {
 function hasOpenPopup() {
   // 로그아웃 확인 모달 (z-index 최상위) — 떠 있을 때만 감지
   if (document.getElementById('logout-modal')?.style.display === 'flex') return true;
+  if (document.getElementById('timed-todos-overlay')) return true;
   if (document.getElementById('habits-modal-overlay')) return true;
   if (document.getElementById('dday-modal-overlay')) return true;
   if (document.getElementById('bucket-modal-overlay')) return true;
@@ -112,6 +242,7 @@ function hasOpenPopup() {
   if (!document.getElementById('month-popup').classList.contains('hidden')) return true;
   if (!document.getElementById('modal-overlay').classList.contains('hidden')) return true;
   if (!document.getElementById('checklist-overlay').classList.contains('hidden')) return true;
+  if (!document.getElementById('time-overlay').classList.contains('hidden')) return true;
   if (!document.getElementById('repeat-edit-overlay').classList.contains('hidden')) return true;
   if (document.getElementById('repeats-panel').classList.contains('open')) return true;
   if (document.getElementById('settings-panel').classList.contains('open')) return true;
@@ -127,6 +258,8 @@ function closeTopPopup() {
     else logoutModal.style.display = 'none';
     return;
   }
+  // 시간 일정 팝업: 뒤로가기 = 확인과 동일
+  if (document.getElementById('timed-todos-overlay')) { closeTimedTodosPopup(); return; }
   const habitsOverlay = document.getElementById('habits-modal-overlay');
   if (habitsOverlay) {
     if (typeof closeHabitsModal === 'function') closeHabitsModal();
@@ -174,6 +307,7 @@ function closeTopPopup() {
     return;
   }
   if (!document.getElementById('checklist-overlay').classList.contains('hidden')) { closeChecklistModal(false); return; }
+  if (!document.getElementById('time-overlay').classList.contains('hidden')) { closeTimeModal(false); return; }
   if (!document.getElementById('repeat-edit-overlay').classList.contains('hidden')) { closeRepeatEditOverlay(); return; }
   if (!document.getElementById('repeat-overlay').classList.contains('hidden')) { document.getElementById('repeat-overlay').classList.add('hidden'); return; }
   if (!document.getElementById('action-popup').classList.contains('hidden')) { closeActionPopup(); return; }

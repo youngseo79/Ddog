@@ -4,6 +4,7 @@
 
 let selectedImportance = 0;
 let checklistItems = []; // [{id, text, checked}]
+let timeValue = null;     // 'HH:MM' 또는 null (할일 시간)
 
 function initModal() {
   document.getElementById('fab-add').addEventListener('click', openAddModal);
@@ -47,6 +48,23 @@ function initModal() {
     openChecklistModal();
   });
 
+  // 시간 토글: 시간 없을 때만 클릭 가능 → 시간 모달 열기 (리스트와 동일 방식)
+  document.getElementById('time-toggle').addEventListener('change', e => {
+    if (timeValue) {
+      // 시간 있으면 체크 해제 불가 → 원상복귀
+      e.target.checked = true;
+      return;
+    }
+    if (e.target.checked) {
+      openTimeModal();
+    }
+  });
+
+  // 시간 버튼 클릭 (시간 있을 때 표시되는 버튼)
+  document.getElementById('time-open-btn').addEventListener('click', () => {
+    openTimeModal();
+  });
+
   // ── 창고 체크박스: 토글 시 detail-section에 storage-mode 클래스 부여
   //    → CSS로 주간/날짜/상기/반복/리스트 입력 비활성화 (반투명 + pointer-events none)
   const storageToggle = document.getElementById('storage-flag-toggle');
@@ -63,6 +81,7 @@ function initModal() {
   }
 
   initChecklistModal();
+  initTimeModal();
   initRepeatEditOverlay();
 }
 
@@ -160,8 +179,12 @@ function openEditModal(todo) {
   }
   updateChecklistUI();
 
+  // 시간 복원
+  timeValue = todo.time_at || null;
+  updateTimeUI();
+
   if (todo.memo || todo.importance > 0 || todo.remind_days > 0 || todo.weekly_flag ||
-      (todo.repeat_type && todo.repeat_type !== 'none') || checklistItems.length > 0) {
+      (todo.repeat_type && todo.repeat_type !== 'none') || checklistItems.length > 0 || timeValue) {
     document.getElementById('detail-toggle').checked = true;
     document.getElementById('detail-section').classList.remove('hidden');
   }
@@ -201,6 +224,7 @@ function closeModal() {
   AppState.editingId = null;
   AppState.editingTodo = null;
   checklistItems = [];
+  timeValue = null;
 }
 
 function resetModalForm() {
@@ -218,6 +242,8 @@ function resetModalForm() {
   document.querySelector('.imp-btn[data-val="0"]').classList.add('active');
   checklistItems = [];
   updateChecklistUI();
+  timeValue = null;
+  updateTimeUI();
   resetRepeat();
 
   // 창고 체크박스 초기화 + storage-mode 클래스 제거
@@ -269,6 +295,93 @@ function updateChecklistUI() {
     label.classList.remove('hidden');
     btn.classList.add('hidden');
   }
+}
+
+// ─── 시간 UI 상태 관리 (리스트와 동일 방식) ───
+// 시간 없음: 체크박스 표시, 버튼 숨김
+// 시간 있음: 체크박스 숨김(checked=true 고정), '🕒 15시' 버튼 표시
+
+function updateTimeUI() {
+  const toggle = document.getElementById('time-toggle');
+  const label  = document.getElementById('time-toggle-label');
+  const btn    = document.getElementById('time-open-btn');
+  if (!toggle || !label || !btn) return;
+
+  if (timeValue) {
+    toggle.checked = true;
+    toggle.disabled = true;
+    label.classList.add('hidden');
+    btn.classList.remove('hidden');
+    btn.textContent = `🕒 ${formatTimeLabel(timeValue)}`;
+  } else {
+    toggle.checked = false;
+    toggle.disabled = false;
+    label.classList.remove('hidden');
+    btn.classList.add('hidden');
+  }
+}
+
+// ─── 시간 모달 ───
+
+function initTimeModal() {
+  const hourSel = document.getElementById('time-hour');
+  const minSel  = document.getElementById('time-minute');
+  for (let h = 0; h < 24; h++) {
+    const o = document.createElement('option');
+    o.value = String(h).padStart(2, '0');
+    o.textContent = String(h);
+    hourSel.appendChild(o);
+  }
+  for (let m = 0; m < 60; m++) {
+    const o = document.createElement('option');
+    o.value = String(m).padStart(2, '0');
+    o.textContent = String(m).padStart(2, '0');
+    minSel.appendChild(o);
+  }
+
+  document.getElementById('time-modal-close').addEventListener('click', () => closeTimeModal(false));
+  document.getElementById('time-overlay').addEventListener('click', e => {
+    if (e.target.id === 'time-overlay') closeTimeModal(false);
+  });
+  document.getElementById('time-cancel-btn').addEventListener('click', () => closeTimeModal(false));
+  document.getElementById('time-confirm-btn').addEventListener('click', () => closeTimeModal(true));
+  document.getElementById('time-delete-btn').addEventListener('click', () => {
+    // 시간 삭제 → 체크박스 상태로 복귀 (리스트 항목을 모두 지운 것과 동일)
+    timeValue = null;
+    updateTimeUI();
+    document.getElementById('time-overlay').classList.add('hidden');
+  });
+}
+
+let _timeBackup = null;
+
+function openTimeModal() {
+  _timeBackup = timeValue;
+  let hh, mm;
+  if (timeValue) {
+    [hh, mm] = timeValue.split(':');
+  } else {
+    // 기본값: 현재 시각의 다음 정시
+    const now = new Date();
+    hh = String((now.getHours() + 1) % 24).padStart(2, '0');
+    mm = '00';
+  }
+  document.getElementById('time-hour').value   = hh;
+  document.getElementById('time-minute').value = mm;
+  document.getElementById('time-delete-btn').classList.toggle('hidden', !timeValue);
+  document.getElementById('time-overlay').classList.remove('hidden');
+}
+
+function closeTimeModal(save) {
+  if (save) {
+    const hh = document.getElementById('time-hour').value;
+    const mm = document.getElementById('time-minute').value;
+    timeValue = `${hh}:${mm}`;
+  } else {
+    timeValue = _timeBackup;
+  }
+  updateTimeUI();
+  document.getElementById('time-overlay').classList.add('hidden');
 }
 
 // ─── 체크리스트 모달 ───
@@ -669,6 +782,7 @@ function isFormChanged(editingTodo, title, memo, date, importance, remind, weekl
   if ((editingTodo.importance  || 0) !== importance)  return true;
   if ((editingTodo.remind_days || 0) !== remind)       return true;
   if (!!editingTodo.weekly_flag !== !!weeklyFlag)      return true;
+  if ((editingTodo.time_at || null) !== (timeValue || null)) return true;
 
   if ((editingTodo.repeat_type     || 'none') !== (repeatData.repeat_type     || 'none')) return true;
   if ((editingTodo.repeat_end_date || null)   !== (repeatData.repeat_end_date || null))   return true;
@@ -766,6 +880,7 @@ async function handleSave() {
       repeat_end_date: null,
       repeat_meta: null,
       storage_flag: true,
+      time_at:     null,
       ...(!isEditing ? { checklist: null } : {}),
     };
   } else {
@@ -776,6 +891,7 @@ async function handleSave() {
       remind_days: remind,
       weekly_flag: weeklyFlag,
       storage_flag: false,
+      time_at:     timeValue || null,
       ...(!isEditing ? { checklist: checklistJson } : {}),
       ...repeatData,
     };

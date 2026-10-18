@@ -88,8 +88,23 @@ function sortActiveTodos(todos) {
       return _repeatTitleCollator.compare(a.title || '', b.title || '');
     }
     if (b.importance !== a.importance) return b.importance - a.importance;
+    // 같은 중요도 안에서: 시간 있는 항목 최상단 → 빠른 시간 순
+    const aTime = a.time_at || '';
+    const bTime = b.time_at || '';
+    if (!!aTime !== !!bTime) return aTime ? -1 : 1;
+    if (aTime && bTime && aTime !== bTime) return aTime < bTime ? -1 : 1;
     return a.sort_order - b.sort_order;
   });
+}
+
+// 'HH:MM' → '15시' / '15시 30분'
+function formatTimeLabel(timeStr) {
+  if (!timeStr) return '';
+  const [hh, mm] = String(timeStr).split(':');
+  const h = parseInt(hh, 10);
+  const m = parseInt(mm, 10) || 0;
+  if (isNaN(h)) return '';
+  return m === 0 ? `${h}시` : `${h}시 ${m}분`;
 }
 
 function makeTodoItem(todo) {
@@ -123,6 +138,13 @@ function makeTodoItem(todo) {
 
   const titleEl = document.createElement('div');
   titleEl.className = 'todo-title';
+  // 시간 표기 (제목 맨 앞): 🕒[15시]
+  if (todo.time_at) {
+    const timeEl = document.createElement('span');
+    timeEl.className = 'todo-time-label';
+    timeEl.textContent = `🕒[${formatTimeLabel(todo.time_at)}] `;
+    titleEl.appendChild(timeEl);
+  }
   // weekly_flag 별표
   if (todo.weekly_flag) {
     const flag = document.createElement('span');

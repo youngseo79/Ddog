@@ -248,6 +248,7 @@ async function insertTodo(data) {
     repeat_master_id: null,
     repeat_exception: false,
     checklist:        data.checklist       || null,
+    time_at:          data.time_at         || null,
     storage_flag:     isStorage,
     created_at:       now,
     updated_at:       now,
