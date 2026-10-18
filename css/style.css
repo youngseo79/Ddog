@@ -1314,6 +1314,124 @@ select:focus { border-color: var(--accent); }
 #checklist-toggle-label.hidden { display: none; }
 
 /* =============================================
+   상기 행: 리스트 / 시간 체크박스 세로 배치
+   ============================================= */
+#remind-flags-column {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-left: 6px;
+}
+.remind-flag-slot { display: flex; align-items: center; }
+#remind-flags-column #checklist-toggle-label { margin-left: 0; }
+/* 세로 배치 시 버튼 높이 축소 (두 줄이 상기 행 높이 안에 들어가도록) */
+#remind-flags-column .checklist-open-btn,
+#remind-flags-column .time-open-btn {
+  padding: 3px 10px;
+  font-size: 12px;
+}
+
+/* 시간 토글 라벨 (리스트 라벨과 동일) */
+#time-toggle-label {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 11px; color: var(--text-secondary);
+  cursor: pointer; flex-shrink: 0;
+  white-space: nowrap;
+}
+#time-toggle-label input { accent-color: var(--accent); width: 14px; height: 14px; }
+#time-toggle-label.hidden { display: none; }
+
+/* 시간 열기 버튼 (시간 있을 때) */
+.time-open-btn {
+  padding: 7px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  background: transparent;
+  transition: all 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-family: var(--font-main);
+}
+.time-open-btn:hover { background: var(--accent-glow); }
+.time-open-btn.hidden { display: none; }
+
+/* 할일 목록 시간 표기 */
+.todo-time-label {
+  color: var(--accent);
+  font-weight: 600;
+  font-family: var(--font-ui);
+}
+
+/* =============================================
+   시간 설정 모달
+   ============================================= */
+#time-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 160;
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(4px);
+}
+#time-overlay.hidden { display: none; }
+
+#time-box {
+  background: var(--bg-elevated);
+  border-radius: var(--radius);
+  padding: 20px;
+  width: calc(100% - 40px);
+  max-width: 360px;
+  display: flex; flex-direction: column;
+  border: 1px solid var(--border-light);
+  gap: 16px;
+}
+#time-header {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 15px; font-weight: 500; color: var(--text-primary);
+}
+#time-modal-close {
+  color: var(--text-muted); font-size: 18px;
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; transition: background 0.15s;
+}
+#time-modal-close:hover { background: var(--bg-hover); }
+
+#time-select-row {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+#time-select-row select {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  color: var(--text-primary);
+  font-size: 16px;
+  font-family: var(--font-ui);
+  outline: none;
+  min-width: 72px;
+  cursor: pointer;
+}
+#time-select-row select:focus { border-color: var(--accent); }
+#time-select-row select option { background: var(--bg-elevated); color: var(--text-primary); }
+.time-unit { font-size: 14px; color: var(--text-secondary); }
+
+#time-footer { display: flex; gap: 8px; }
+.time-footer-btn {
+  flex: 1; padding: 11px;
+  border-radius: var(--radius-sm);
+  font-size: 14px; font-weight: 500;
+  transition: opacity 0.15s;
+}
+.time-footer-btn.hidden { display: none; }
+.time-footer-btn.delete { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+.time-footer-btn.cancel { background: var(--bg-hover); color: var(--text-secondary); }
+.time-footer-btn.confirm { background: var(--accent); color: #1a1a2e; }
+.time-footer-btn:hover { opacity: 0.85; }
+
+/* =============================================
    라이트 모드
    ============================================= */
 body.light-mode {
@@ -1425,6 +1543,7 @@ body.light-mode select {
 /* 반복 설정 모달 */
 body.light-mode #repeat-box,
 body.light-mode #checklist-box,
+body.light-mode #time-box,
 body.light-mode #year-box,
 body.light-mode #month-box { border-color: #bdc1b8; }
 
