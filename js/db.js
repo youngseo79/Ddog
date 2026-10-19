@@ -300,8 +300,15 @@ async function insertTodo(data) {
   return localTodo;
 }
 
+// 상기 사본 제목 괄호 안 표기: "10월 20일 15시" (시간 없으면 날짜만)
+function remindLabelWithTime(dateLabel, timeAt) {
+  const timeLabel = (timeAt && typeof formatTimeLabel === 'function') ? formatTimeLabel(timeAt) : '';
+  return [dateLabel, timeLabel].filter(Boolean).join(' ');
+}
+
 async function insertRemindCopy(original, remindDate, dateLabel) {
-  const titleSuffix = dateLabel ? `(${dateLabel})` : '';
+  const label = remindLabelWithTime(dateLabel, original && original.time_at);
+  const titleSuffix = label ? `(${label})` : '';
   const now = new Date().toISOString();
   const payload = {
     title:       `🔔 ${original.title}${titleSuffix}`,
@@ -403,12 +410,13 @@ async function syncRemindCopy(before, after) {
     (before.date || '')  !== (after.date || '') ||
     (before.title || '') !== (after.title || '') ||
     (before.memo || '')  !== (after.memo || '') ||
-    (before.importance || 0) !== (after.importance || 0);
+    (before.importance || 0) !== (after.importance || 0) ||
+    (before.time_at || null) !== (after.time_at || null);
   if (!changed) return;
 
   const [first, ...extra] = copies;
   await updateTodo(first.id, {
-    title:      `🔔 ${after.title}(${dateLabel})`,
+    title:      `🔔 ${after.title}(${remindLabelWithTime(dateLabel, after.time_at)})`,
     memo:       after.memo || '',
     importance: after.importance,
     date:       remindDate,
