@@ -2,6 +2,9 @@
 // repeat.js — 반복 설정 모달 & 반복 계산
 // =============================================
 
+const LUNAR_REPEAT_LAST_YEAR = 2049; // 음력 반복 최종 연도 (데이터는 2050년까지지만 여유를 둠)
+const BIRTHDAY_EMOJI = '🎂';
+
 let repeatConfig = {
   type: 'none',
   weekdays: [],      // 매주: [0~6] 배열
@@ -11,6 +14,7 @@ let repeatConfig = {
   monthWeekday: 1,   // 매월 X째주 Y요일
   yearlyMonth: 1,    // 매년 M월
   yearlyDay: 0,      // 매년 M월 N일 (0 = 미설정)
+  yearlyLunar: false,// 매년: 음력 기준 여부
   customUnit: 'day', // 커스텀: 'day'|'week'|'month'|'year'
   customInterval: 2, // 커스텀: 반복 간격 (N)
   endDate: null,
@@ -58,6 +62,32 @@ function initRepeat() {
     });
   });
 
+  // 매년 - 음력 체크박스: 상단 날짜를 음력/양력으로 변환해 월·일 칸에 채움
+  document.getElementById('repeat-yearly-lunar').addEventListener('change', e => {
+    const baseDate = document.getElementById('input-date').value || getDefaultDate();
+    const d = new Date(baseDate + 'T00:00:00');
+    if (e.target.checked) {
+      if (d.getFullYear() > LUNAR_REPEAT_LAST_YEAR) {
+        showToast(`음력 반복은 ${LUNAR_REPEAT_LAST_YEAR}년까지만 가능합니다`);
+        e.target.checked = false;
+        return;
+      }
+      const lunar = (typeof getLunarInfo === 'function')
+        ? getLunarInfo(d.getFullYear(), d.getMonth() + 1, d.getDate()) : null;
+      if (!lunar) {
+        showToast('해당 날짜의 음력 날짜가 없습니다');
+        e.target.checked = false;
+        return;
+      }
+      document.getElementById('repeat-yearly-month').value = lunar.month;
+      document.getElementById('repeat-yearly-day').value   = lunar.day;
+    } else {
+      document.getElementById('repeat-yearly-month').value = d.getMonth() + 1;
+      document.getElementById('repeat-yearly-day').value   = d.getDate();
+    }
+    updateYearlyLunarLabel(e.target.checked);
+  });
+
   // 종료일 토글
   document.getElementById('repeat-end-toggle').addEventListener('change', e => {
     document.getElementById('repeat-end-date-wrap').classList.toggle('hidden', !e.target.checked);
@@ -70,8 +100,16 @@ function openRepeatModal() {
 
   // 초기값 세팅
   document.getElementById('repeat-monthly-day').value = repeatConfig.monthDay || '';
-  document.getElementById('repeat-yearly-month').value = repeatConfig.yearlyMonth || (d.getMonth() + 1);
-  document.getElementById('repeat-yearly-day').value = repeatConfig.yearlyDay || '';
+  // 매년: 이미 매년으로 설정된 경우는 저장값, 아니면 상단 입력 날짜(양력)로 기본 세팅
+  const isYearlySet = repeatConfig.type === 'yearly' && repeatConfig.yearlyDay;
+  document.getElementById('repeat-yearly-month').value = isYearlySet ? repeatConfig.yearlyMonth : (d.getMonth() + 1);
+  document.getElementById('repeat-yearly-day').value   = isYearlySet ? repeatConfig.yearlyDay   : d.getDate();
+  const lunarChk = document.getElementById('repeat-yearly-lunar');
+  lunarChk.checked = isYearlySet ? !!repeatConfig.yearlyLunar : false;
+  updateYearlyLunarLabel(lunarChk.checked);
+  // 생일: 제목이 🎂로 시작하면 체크된 상태로 표시
+  document.getElementById('repeat-yearly-birthday').checked =
+    (document.getElementById('input-title').value || '').trim().startsWith(BIRTHDAY_EMOJI);
   document.getElementById('repeat-end-date').value = repeatConfig.endDate || '';
   document.getElementById('repeat-end-toggle').checked = !!repeatConfig.endDate;
   document.getElementById('repeat-end-date-wrap').classList.toggle('hidden', !repeatConfig.endDate);
@@ -144,10 +182,25 @@ function confirmRepeat() {
   }
 
   if (type === 'yearly') {
+    const isLunar = document.getElementById('repeat-yearly-lunar').checked;
+    const maxDay  = isLunar ? 30 : 31;
     repeatConfig.yearlyMonth = parseInt(document.getElementById('repeat-yearly-month').value) || 1;
     const val = parseInt(document.getElementById('repeat-yearly-day').value);
-    if (!val || val < 1 || val > 31) { showToast('날짜를 입력해주세요 (1~31)'); return; }
-    repeatConfig.yearlyDay = val;
+    if (!val || val < 1 || val > maxDay) { showToast(`날짜를 입력해주세요 (1~${maxDay})`); return; }
+    repeatConfig.yearlyDay   = val;
+    repeatConfig.yearlyLunar = isLunar;
+
+    // 생일: 체크 시 제목 앞에 🎂 추가, 해제 시 제거
+    const titleEl = document.getElementById('input-title');
+    const title   = (titleEl.value || '').trim();
+    const hasCake = title.startsWith(BIRTHDAY_EMOJI);
+    if (document.getElementById('repeat-yearly-birthday').checked) {
+      if (!hasCake) titleEl.value = `${BIRTHDAY_EMOJI} ${title}`;
+    } else if (hasCake) {
+      titleEl.value = title.slice(BIRTHDAY_EMOJI.length).trimStart();
+    }
+  } else {
+    repeatConfig.yearlyLunar = false;
   }
 
   if (type === 'custom') {
@@ -169,7 +222,7 @@ function confirmRepeat() {
 }
 
 function resetRepeat() {
-  repeatConfig = { type: 'none', weekdays: [], monthMode: 'day', monthDay: 0, monthWeek: 1, monthWeekday: 1, yearlyMonth: 1, yearlyDay: 0, customUnit: 'day', customInterval: 2, endDate: null };
+  repeatConfig = { type: 'none', weekdays: [], monthMode: 'day', monthDay: 0, monthWeek: 1, monthWeekday: 1, yearlyMonth: 1, yearlyDay: 0, yearlyLunar: false, customUnit: 'day', customInterval: 2, endDate: null };
   updateRepeatBtn();
 }
 
@@ -194,7 +247,7 @@ function getRepeatLabel() {
         return `매월 ${weeks[repeatConfig.monthWeek-1]}주 ${days[repeatConfig.monthWeekday]}`;
       }
       return `매월 ${repeatConfig.monthDay}일`;
-    case 'yearly':  return `매년 ${repeatConfig.yearlyMonth}/${repeatConfig.yearlyDay}`;
+    case 'yearly':  return `매년 ${repeatConfig.yearlyLunar ? '음력 ' : ''}${repeatConfig.yearlyMonth}/${repeatConfig.yearlyDay}`;
     case 'custom': {
       const unitLabels = { day: '일', week: '주', month: '개월', year: '년' };
       return `매 ${repeatConfig.customInterval}${unitLabels[repeatConfig.customUnit] || '일'}마다`;
@@ -221,6 +274,7 @@ function repeatConfigToData() {
       monthWeekday:  repeatConfig.monthWeekday,
       yearlyMonth:   repeatConfig.yearlyMonth,
       yearlyDay:     repeatConfig.yearlyDay,
+      yearlyLunar:   repeatConfig.type === 'yearly' && !!repeatConfig.yearlyLunar,
       customUnit:    repeatConfig.customUnit,
       customInterval:repeatConfig.customInterval,
     }),
@@ -230,7 +284,7 @@ function repeatConfigToData() {
 // DB에서 불러온 데이터로 repeatConfig 복원
 function dataToRepeatConfig(todo) {
   if (!todo.repeat_type || todo.repeat_type === 'none') {
-    return { type: 'none', weekdays: [], monthMode: 'day', monthDay: 1, monthWeek: 1, monthWeekday: 1, yearlyMonth: 1, yearlyDay: 1, customDays: [], endDate: null };
+    return { type: 'none', weekdays: [], monthMode: 'day', monthDay: 1, monthWeek: 1, monthWeekday: 1, yearlyMonth: 1, yearlyDay: 1, yearlyLunar: false, customDays: [], endDate: null };
   }
   let meta = {};
   try { meta = JSON.parse(todo.repeat_meta || '{}'); } catch(e) {}
@@ -243,10 +297,34 @@ function dataToRepeatConfig(todo) {
     monthWeekday:meta.monthWeekday != null ? meta.monthWeekday : 1,
     yearlyMonth: meta.yearlyMonth  != null ? meta.yearlyMonth  : 1,
     yearlyDay:   meta.yearlyDay    != null ? meta.yearlyDay    : 1,
+    yearlyLunar: !!meta.yearlyLunar,
     customUnit:  meta.customUnit     != null ? meta.customUnit     : 'day',
     customInterval: meta.customInterval != null ? meta.customInterval : 2,
     endDate:     todo.repeat_end_date || null,
   };
+}
+
+// 매년 라벨: 음력 체크 시 '매년(음력)'
+function updateYearlyLunarLabel(isLunar) {
+  const el = document.getElementById('repeat-yearly-label');
+  if (el) el.textContent = isLunar ? '매년(음력)' : '매년';
+}
+
+// 음력 매년 반복 매칭
+// - 윤달은 건너뜀(평달 기준), 음력 30일이 없는 해(작은달)는 그 달 29일에 표시
+// - 종료일이 없어도 LUNAR_REPEAT_LAST_YEAR년까지만 반복
+function isLunarYearlyMatch(target, ym, yd) {
+  if (target.getFullYear() > LUNAR_REPEAT_LAST_YEAR) return false;
+  if (typeof getLunarInfo !== 'function') return false;
+  const l = getLunarInfo(target.getFullYear(), target.getMonth() + 1, target.getDate());
+  if (!l || l.leap || l.month !== ym) return false;
+  if (l.day === yd) return true;
+  if (yd === 30 && l.day === 29) {
+    const next = new Date(target.getFullYear(), target.getMonth(), target.getDate() + 1);
+    const nl = getLunarInfo(next.getFullYear(), next.getMonth() + 1, next.getDate());
+    return !!nl && nl.day === 1; // 이 달이 29일로 끝나는 작은달
+  }
+  return false;
 }
 
 // 커스텀 단위 라벨 업데이트 헬퍼
@@ -308,6 +386,7 @@ function isRepeatMatch(todo, dateStr) {
     case 'yearly': {
       const ym = meta.yearlyMonth || 1;
       const yd = meta.yearlyDay || 1;
+      if (meta.yearlyLunar) return isLunarYearlyMatch(target, ym, yd);
       return (target.getMonth() + 1) === ym && target.getDate() === yd;
     }
     case 'custom': {

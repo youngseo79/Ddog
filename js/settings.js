@@ -611,7 +611,7 @@ function getRepeatDescFromTodo(todo) {
         return `매월 ${weeks[(meta.monthWeek||1)-1]}주 ${days[meta.monthWeekday??1]}`;
       }
       return `매월 ${todo.repeat_day||1}일`;
-    case 'yearly': return `매년 ${meta.yearlyMonth||1}월 ${meta.yearlyDay||1}일`;
+    case 'yearly': return `매년 ${meta.yearlyLunar ? '음력 ' : ''}${meta.yearlyMonth||1}월 ${meta.yearlyDay||1}일`;
     case 'custom': {
       const unitLabels = { day: '일', week: '주', month: '개월', year: '년' };
       const interval = meta.customInterval || 2;
