@@ -167,6 +167,40 @@
   margin-top: 3px !important;
 }
 
+/* 달력 칸 음력: 할일 점(margin-top 3px + 7px) 바로 아래 */
+#pc-left .cal-lunar {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 12px;
+  font-size: clamp(9px, 2.4cqw, 12px);
+  font-weight: 400;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+/* 음력 span은 날짜 span 안에 있으므로, 할일 점(span::after)이 음력에 또 찍히지 않게 차단 */
+#pc-left .cal-day span.cal-lunar::after { content: none !important; display: none !important; }
+
+/* 날짜줄 음력: 양력과 날씨 사이 */
+#pc-center #lunar-date-label {
+  order: 1;
+  margin-left: 14px;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1;
+  align-self: center;
+  color: var(--text-secondary);
+  /* 중앙 패널이 좁을 때 날씨를 밀어내지 않도록 음력이 먼저 줄어듦(… 처리) */
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* 달력 아래 남은 공간 */
 #pc-left-footer {
   flex: 1;

@@ -138,6 +138,10 @@ ul { list-style: none; }
 #selected-date-label.date-label-weekday { color: var(--text-primary); }
 #selected-date-label.date-label-sat { color: var(--sat); }
 #selected-date-label.date-label-sun { color: var(--danger); }
+/* 음력 (모바일: 양력 아래 줄에 작게) */
+#date-label-wrap { display: flex; flex-direction: column; justify-content: center; line-height: 1.15; }
+#lunar-date-label { font-size: 10.5px; font-weight: 400; color: var(--text-muted); font-family: var(--font-ui); margin-top: 1px; white-space: nowrap; }
+#lunar-date-label:empty { display: none; }
 
 #date-bar-actions {
   display: flex; align-items: center; gap: 4px;
