@@ -196,7 +196,7 @@
       <div id="calendar-grid"></div>
     </div>
     <div id="selected-date-bar">
-      <span id="selected-date-label"></span><span id="weather-display" style="margin-left:10px;font-size:13px;color:var(--text-secondary);white-space:nowrap;"></span>
+      <div id="date-label-wrap"><span id="selected-date-label"></span><span id="lunar-date-label"></span></div><span id="weather-display" style="margin-left:10px;font-size:13px;color:var(--text-secondary);white-space:nowrap;"></span>
       <div id="date-bar-actions" style="visibility:hidden">
         <button id="lightmode-toggle" title="라이트/다크 모드 전환">
           <div class="lm-toggle-track"><div class="lm-toggle-thumb"></div></div>
@@ -618,6 +618,7 @@
 <script src="js/config.js"></script>
 <script src="js/db.js"></script>
 <script src="js/sync.js"></script>
+<script src="js/lunar.min.js"></script>
 <script src="js/calendar.js"></script>
 <script src="js/repeat.js"></script>
 <script src="js/modal.js"></script>
