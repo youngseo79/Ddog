@@ -1040,6 +1040,16 @@ select {
 }
 select:focus { border-color: var(--accent); }
 
+/* 매년 반복: 월 드랍다운과 일 입력칸 크기 통일 */
+#repeat-yearly-month,
+#repeat-yearly-day {
+  box-sizing: border-box;
+  width: 68px;
+  height: 32px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
 /* ── 반복 삭제 선택 시트 (action-box 내부 오버레이) ── */
 .repeat-delete-sheet {
   position: absolute;
