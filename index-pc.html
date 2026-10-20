@@ -363,7 +363,7 @@
         </div>
         <div id="repeat-yearly-wrap" class="repeat-detail hidden">
           <div class="repeat-option">
-            <label>매년</label>
+            <label id="repeat-yearly-label">매년</label>
             <select id="repeat-yearly-month">
               <option value="1">1월</option><option value="2">2월</option><option value="3">3월</option>
               <option value="4">4월</option><option value="5">5월</option><option value="6">6월</option>
@@ -372,6 +372,10 @@
             </select>
             <input type="number" id="repeat-yearly-day" min="1" max="31" placeholder="1" />
             <span>일</span>
+          </div>
+          <div class="repeat-option" style="gap:16px;">
+            <label class="repeat-end-label"><input type="checkbox" id="repeat-yearly-lunar" /><span>음력</span></label>
+            <label class="repeat-end-label"><input type="checkbox" id="repeat-yearly-birthday" /><span>생일</span></label>
           </div>
         </div>
         <div id="repeat-custom-wrap" class="repeat-detail hidden">
