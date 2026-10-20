@@ -5,6 +5,19 @@
 let calCollapsed = false;
 let miniWeekStart = null; // 축소(한 줄) 달력에 표시 중인 주의 일요일
 
+// ── 음력 변환 (js/lunar.min.js, 한국천문연구원 기준, 양력 2050-12-31까지) ──
+// 라이브러리가 없거나 범위 밖이면 null → 음력만 표시되지 않고 나머지는 정상 동작
+let _lunarCal = null;
+function getLunarInfo(year, month, day) {
+  try {
+    if (typeof KoreanLunarCalendar === 'undefined') return null;
+    if (!_lunarCal) _lunarCal = new KoreanLunarCalendar();
+    if (!_lunarCal.setSolarDate(year, month, day)) return null;
+    const l = _lunarCal.getLunarCalendar();
+    return { month: l.month, day: l.day, leap: !!l.intercalation };
+  } catch (e) { return null; }
+}
+
 function initCalendar() {
   document.getElementById('cal-toggle-btn').addEventListener('click', toggleCalendar);
 
@@ -196,6 +209,18 @@ function makeCalCell(day, year, month, isOtherMonth, today, selectedDate) {
   if (isOtherMonth) el.classList.add('other-month');
   if (dow === 0) el.classList.add('sun');
   if (dow === 6) el.classList.add('sat');
+  // PC 달력 칸: 할일 점 아래에 음력 1일·15일만 표시 ('월.일', 윤달은 '윤월.일')
+  if (document.body.classList.contains('pc-layout')) {
+    const lunar = getLunarInfo(date.getFullYear(), date.getMonth() + 1, date.getDate());
+    if (lunar && (lunar.day === 1 || lunar.day === 15)) {
+      const lu = document.createElement('span');
+      lu.className = 'cal-lunar';
+      lu.textContent = `${lunar.leap ? '윤' : ''}${lunar.month}.${lunar.day}`;
+      if (lunar.day === 1) lu.classList.add('lunar-first');
+      span.appendChild(lu);
+    }
+  }
+
   if (dateStr === today) el.classList.add('today');
   if (dateStr === selectedDate) el.classList.add('selected');
   if (AppState.dotDates.has(dateStr)) el.classList.add('has-todo');
@@ -238,6 +263,13 @@ function updateSelectedDateLabel() {
   const el = document.getElementById('selected-date-label');
   el.textContent = label;
   el.className = dow === 0 ? 'date-label-sun' : dow === 6 ? 'date-label-sat' : 'date-label-weekday';
+
+  // 선택 날짜의 음력 표시 (모바일: 양력 아래 줄 / PC: 양력과 날씨 사이)
+  const lunarEl = document.getElementById('lunar-date-label');
+  if (lunarEl) {
+    const lunar = getLunarInfo(d.getFullYear(), d.getMonth() + 1, d.getDate());
+    lunarEl.textContent = lunar ? `음력 ${lunar.leap ? '윤' : ''}${lunar.month}월 ${lunar.day}일` : '';
+  }
 }
 
 async function updateMonthDots() {
