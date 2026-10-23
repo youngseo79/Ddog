@@ -556,7 +556,18 @@ async function loadRepeats() {
       // 반복함에는 "오늘 이후로 아직 한 번이라도 더 나올" 반복만 표시
       // → '이 날짜 이후 삭제'/종료일 만료 등으로 남은 발생분이 없으면 목록에서 제외
       hasRemainingOccurrence(t, all, today)
-    ).sort((a, b) => (b.created_at || '') > (a.created_at || '') ? 1 : -1);
+    ).sort((a, b) => {
+      // 정렬: 일반 반복(상단) → 생일(🎂, 하단), 각 그룹 안에서는 이름 오름차순
+      const cake  = '🎂';
+      const aT = (a.title || '').trim();
+      const bT = (b.title || '').trim();
+      const aB = aT.startsWith(cake);
+      const bB = bT.startsWith(cake);
+      if (aB !== bB) return aB ? 1 : -1;
+      const aName = aB ? aT.slice(cake.length).trimStart() : aT;
+      const bName = bB ? bT.slice(cake.length).trimStart() : bT;
+      return aName.localeCompare(bName, 'ko', { numeric: true, sensitivity: 'base' });
+    });
 
     if (!rows.length) {
       list.innerHTML = '<div class="empty-state"><div class="empty-icon">🔁</div>반복 일정이 없어요</div>';
