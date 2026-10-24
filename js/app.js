@@ -109,6 +109,30 @@ async function buildTimedTodosForPopup(serverPromise) {
     result = localRows;
   }
 
+  // 반복 일정: 마스터 행(시작일 날짜로 저장됨)은 직접 행에서 제외하고,
+  // 오늘에 해당하는 반복 일정을 가상 행으로 계산해 추가 (todo.js 렌더링과 동일한 방식)
+  // → 시작일 이후 반복일에도 팝업에 표시, 오늘 완료/삭제/개별 수정된 날은 예외 행 기준으로 처리
+  result = result.filter(t => {
+    if (!t) return false;
+    if (t.repeat_deleted) return false;
+    if (t.repeat_type && t.repeat_type !== 'none' && t.repeat_exception !== true) return false;
+    return true;
+  });
+  try {
+    const repeatMasters = await fetchRepeatMasters(today);
+    const localExceptions = await fetchRepeatExceptions(today);
+    const exceptionIds = new Set(
+      [...(localExceptions || []), ...result.filter(t => t.repeat_exception === true)]
+        .map(e => String(e.repeat_master_id))
+    );
+    const virtualRows = (repeatMasters || [])
+      .filter(m => isRepeatMatch(m, today) && !exceptionIds.has(String(m.id)))
+      .map(m => ({ ...m, _virtual: true, _masterId: m.id, date: today }));
+    result = [...result, ...virtualRows];
+  } catch(e) {
+    console.warn('[app] 시간 일정 팝업: 반복 일정 계산 실패', e);
+  }
+
   return result
     .filter(isTimedUndone)
     .sort((a, b) => (a.time_at < b.time_at ? -1 : a.time_at > b.time_at ? 1 : 0));
