@@ -1090,9 +1090,26 @@ function pcCloseDropdownOutside(e) {
 }
 
 /* ── 날짜 선택: 커스텀 달력 팝업 ── */
-function pcPickDate(id, fromWeekly, targetDate, onSelect) {
+//   opts (선택, 날짜 입력칸에서 호출할 때만 사용):
+//     backdrop    : true면 투명 배경을 깔아, 바깥 클릭 시 달력만 닫히고 아래 창(할일 입력창 등)은 눌리지 않음
+//     noHighlight : true면 강조 날짜 표시 안 함 (종료일이 비어 있을 때)
+//   opts 없이 호출하는 기존 용도(할일/주간/창고 ⋮ 메뉴)는 동작 변화 없음
+function pcPickDate(id, fromWeekly, targetDate, onSelect, opts) {
+  const _opts = opts || {};
   const existing = document.getElementById('pc-date-picker-popup');
   if (existing) existing.remove();
+  document.getElementById('pc-date-picker-backdrop')?.remove();
+
+  let backdrop = null;
+  if (_opts.backdrop) {
+    backdrop = document.createElement('div');
+    backdrop.id = 'pc-date-picker-backdrop';
+    backdrop.style.cssText = 'position:fixed;inset:0;z-index:599;background:transparent;';
+  }
+  const closePicker = () => {
+    popup.remove();
+    if (backdrop) backdrop.remove();
+  };
 
   const initDate = targetDate || AppState.selectedDate;
   let pickerYear  = parseInt(initDate.split('-')[0]);
@@ -1158,7 +1175,7 @@ function pcPickDate(id, fromWeekly, targetDate, onSelect) {
     const closeBtn = document.createElement('button');
     closeBtn.textContent = '✕';
     closeBtn.style.cssText = 'font-size:16px;color:var(--text-muted);background:none;border:none;cursor:pointer;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-left:4px;';
-    closeBtn.addEventListener('click', (e) => { e.stopPropagation(); popup.remove(); });
+    closeBtn.addEventListener('click', (e) => { e.stopPropagation(); closePicker(); });
 
     header.appendChild(prevBtn);
     header.appendChild(titleEl);
@@ -1183,7 +1200,7 @@ function pcPickDate(id, fromWeekly, targetDate, onSelect) {
     const firstDay = new Date(pickerYear, pickerMonth - 1, 1).getDay();
     const lastDate = new Date(pickerYear, pickerMonth, 0).getDate();
     const todayStr2   = toLocalDateStr(new Date());
-    const highlightDate = popup.dataset.todayPick || initDate;
+    const highlightDate = popup.dataset.todayPick || (_opts.noHighlight ? null : initDate);
 
     for (let i = 0; i < firstDay; i++) grid.appendChild(document.createElement('div'));
 
@@ -1206,7 +1223,7 @@ function pcPickDate(id, fromWeekly, targetDate, onSelect) {
       cell.addEventListener('mouseout',  () => { if (!isSelected) cell.style.background = isToday ? 'var(--accent-glow)' : 'none'; });
       cell.addEventListener('click', async (e) => {
         e.stopPropagation();
-        popup.remove();
+        closePicker();
         try {
           if (typeof onSelect === 'function') {
             // 창고 등 다른 용도: 커스텀 콜백 사용
@@ -1226,11 +1243,12 @@ function pcPickDate(id, fromWeekly, targetDate, onSelect) {
   }
 
   renderPicker();
+  if (backdrop) document.body.appendChild(backdrop);
   document.body.appendChild(popup);
   setTimeout(() => {
     document.addEventListener('click', function outsideClose(e) {
       if (!popup.contains(e.target)) {
-        popup.remove();
+        closePicker();
         document.removeEventListener('click', outsideClose);
       }
     });
