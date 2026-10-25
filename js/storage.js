@@ -530,22 +530,38 @@ function _pickDateForStoragePc(storageId) {
 
 // ── 외부(gesture.js 등)에서 재사용할 공용 날짜 선택 달력 ──
 //   storage 관련 없이, 단순히 "예쁜 달력 띄우고 선택된 날짜를 콜백으로 돌려주는" 용도
+//   initialDate('YYYY-MM-DD')를 주면 그 날짜가 있는 달부터 열리고 그 날짜를 강조 표시.
+//   initialDate가 없으면 기존처럼 오늘이 있는 달부터 열림 (창고 탭 등 기존 호출 동작 유지).
 function openCustomDatePicker(onSelect, initialDate) {
-  // storageId=null, isPc=false(자동 분기 아님), onSelect 콜백 주입
-  // initialDate는 현재 _openStorageDatePicker가 오늘 기준으로 시작하므로 생략
-  _openStorageDatePicker(null, false, onSelect);
+  _openStorageDatePicker(null, false, onSelect, initialDate);
 }
 
 // ── 공용 커스텀 달력 팝업 (모바일/PC 공통) ──
 //   storageId 가 있으면: 창고→일반 할일 전환 (기존 동작)
 //   onSelect  가 있으면: 선택한 dateStr 로 콜백 호출 (일반 할일/주간에서 재사용용)
-function _openStorageDatePicker(storageId, isPc, onSelect) {
+//   initialDate (선택) : 시작 달 + 선택 날짜 강조
+//   모바일: 달력 위에서 좌우 스와이프로 이전 달/다음 달 이동 (메인 달력과 동일한 판정 기준)
+function _openStorageDatePicker(storageId, isPc, onSelect, initialDate) {
   const existing = document.getElementById('storage-date-picker-popup');
   if (existing) existing.remove();
+  document.getElementById('storage-date-picker-backdrop')?.remove();
 
   const today = new Date();
   let pickerYear  = today.getFullYear();
   let pickerMonth = today.getMonth() + 1;
+
+  // 시작 달 / 강조 날짜 (initialDate가 올바른 형식일 때만)
+  const _validInit = typeof initialDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(initialDate);
+  if (_validInit) {
+    pickerYear  = parseInt(initialDate.slice(0, 4), 10);
+    pickerMonth = parseInt(initialDate.slice(5, 7), 10);
+  }
+  const highlightDate = _validInit ? initialDate : null;
+
+  // 스와이프 직후의 클릭이 날짜 선택/버튼으로 오인되지 않도록 잠금
+  let _swipeLock = false;
+  // 직전에 그린 날짜 그리드 (스와이프 슬라이드 애니메이션용)
+  let _currentGrid = null;
 
   // 화면 크기에 따라 팝업 너비 결정
   const vw = window.innerWidth;
@@ -590,7 +606,10 @@ function _openStorageDatePicker(storageId, isPc, onSelect) {
   popup.style.left = Math.round((vw - popupWidth) / 2) + 'px';
   popup.style.top  = Math.round((window.innerHeight - 440) / 2) + 'px';
 
-  function renderPicker() {
+  // dir: 스와이프로 넘어온 경우 1(다음 달) / -1(이전 달) → 슬라이드 애니메이션
+  //      버튼으로 넘어온 경우 undefined → 기존처럼 즉시 다시 그림
+  function renderPicker(dir) {
+    const oldGrid = (dir && _currentGrid) ? _currentGrid : null;
     popup.innerHTML = '';
 
     const header = document.createElement('div');
@@ -601,6 +620,7 @@ function _openStorageDatePicker(storageId, isPc, onSelect) {
     prevBtn.style.cssText = 'font-size:28px;color:var(--text-secondary);background:none;border:none;cursor:pointer;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;';
     prevBtn.addEventListener('click', e => {
       e.stopPropagation();
+      if (_swipeLock) return;
       pickerMonth--; if (pickerMonth < 1) { pickerMonth = 12; pickerYear--; }
       renderPicker();
     });
@@ -614,15 +634,17 @@ function _openStorageDatePicker(storageId, isPc, onSelect) {
     nextBtn.style.cssText = prevBtn.style.cssText;
     nextBtn.addEventListener('click', e => {
       e.stopPropagation();
+      if (_swipeLock) return;
       pickerMonth++; if (pickerMonth > 12) { pickerMonth = 1; pickerYear++; }
       renderPicker();
     });
 
     const thisMonthBtn = document.createElement('button');
-    thisMonthBtn.textContent = '오늘';
+    thisMonthBtn.textContent = '이번 달';
     thisMonthBtn.style.cssText = 'font-size:11px;font-weight:600;color:var(--accent);background:var(--accent-glow);border:1px solid var(--accent);cursor:pointer;padding:5px 10px;border-radius:12px;white-space:nowrap;flex-shrink:0;';
     thisMonthBtn.addEventListener('click', e => {
       e.stopPropagation();
+      if (_swipeLock) return;
       const t = new Date();
       pickerYear  = t.getFullYear();
       pickerMonth = t.getMonth() + 1;
@@ -655,6 +677,10 @@ function _openStorageDatePicker(storageId, isPc, onSelect) {
     });
     popup.appendChild(wdays);
 
+    // 그리드를 감싸는 틀 (슬라이드 애니메이션 시 넘치는 부분 숨김)
+    const gridWrap = document.createElement('div');
+    gridWrap.style.cssText = 'position:relative;overflow:hidden;';
+
     const grid = document.createElement('div');
     grid.style.cssText = 'display:grid;grid-template-columns:repeat(7,1fr);gap:2px;';
 
@@ -668,18 +694,20 @@ function _openStorageDatePicker(storageId, isPc, onSelect) {
       const dateStr = `${pickerYear}-${String(pickerMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
       const cell = document.createElement('button');
       cell.textContent = d;
-      const isToday = dateStr === todayStr2;
+      const isToday    = dateStr === todayStr2;
+      const isSelected = !!highlightDate && dateStr === highlightDate;
       const dow = new Date(pickerYear, pickerMonth - 1, d).getDay();
       const color = dow === 0 ? 'var(--danger)' : dow === 6 ? 'var(--sat)' : 'var(--text-primary)';
       cell.style.cssText = `
         aspect-ratio:1;width:100%;border:none;cursor:pointer;border-radius:50%;
-        font-size:15px;font-weight:${isToday?'700':'400'};
-        background:${isToday?'var(--accent-glow)':'none'};
-        color:${color};
+        font-size:15px;font-weight:${isToday||isSelected?'700':'400'};
+        background:${isSelected?'var(--accent)':isToday?'var(--accent-glow)':'none'};
+        color:${isSelected?'#1a1a2e':color};
         display:flex;align-items:center;justify-content:center;transition:background 0.12s;
       `;
       cell.addEventListener('click', async e => {
         e.stopPropagation();
+        if (_swipeLock) return;
         popup.remove();
         backdrop.remove();
         try {
@@ -703,13 +731,165 @@ function _openStorageDatePicker(storageId, isPc, onSelect) {
       });
       grid.appendChild(cell);
     }
-    popup.appendChild(grid);
+    gridWrap.appendChild(grid);
+    popup.appendChild(gridWrap);
+    _currentGrid = grid;
+
+    // ── 스와이프 슬라이드 애니메이션 (메인 달력 animateCalendar와 같은 방식) ──
+    if (oldGrid) {
+      oldGrid.style.position = 'absolute';
+      oldGrid.style.top = '0';
+      oldGrid.style.left = '0';
+      oldGrid.style.width = '100%';
+      oldGrid.style.pointerEvents = 'none';
+      oldGrid.style.transition = 'none';
+      oldGrid.style.transform = 'translateX(0)';
+      gridWrap.appendChild(oldGrid);
+
+      const fromX = dir > 0 ? '100%' : '-100%';
+      const toX   = dir > 0 ? '-100%' : '100%';
+      grid.style.transition = 'none';
+      grid.style.transform  = `translateX(${fromX})`;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const dur = '0.28s cubic-bezier(0.4,0,0.2,1)';
+          grid.style.transition = `transform ${dur}`;
+          grid.style.transform  = 'translateX(0)';
+          oldGrid.style.transition = `transform ${dur}`;
+          oldGrid.style.transform  = `translateX(${toX})`;
+          setTimeout(() => {
+            oldGrid.remove();
+            grid.style.transition = '';
+            grid.style.transform  = '';
+          }, 300);
+        });
+      });
+    }
+  }
+
+  // ── 모바일 좌우 스와이프: 이전 달 / 다음 달 ──
+  //   판정 기준은 메인 달력(initCalendarSwipe)과 동일: 가로 이동이 세로보다 크고 50px 초과
+  //   리스너는 popup 자체에 한 번만 등록 (renderPicker는 popup 내부만 다시 그림)
+  {
+    let sx = 0, sy = 0, movedH = false;
+    popup.addEventListener('touchstart', e => {
+      sx = e.touches[0].clientX;
+      sy = e.touches[0].clientY;
+      movedH = false;
+    }, { passive: true });
+    popup.addEventListener('touchmove', e => {
+      const dx = Math.abs(e.touches[0].clientX - sx);
+      const dy = Math.abs(e.touches[0].clientY - sy);
+      if (dx > dy && dx > 10) movedH = true;
+    }, { passive: true });
+    popup.addEventListener('touchend', e => {
+      const dx = e.changedTouches[0].clientX - sx;
+      if (movedH && Math.abs(dx) > 50) {
+        _swipeLock = true;
+        setTimeout(() => { _swipeLock = false; }, 350);
+        const dir = dx < 0 ? 1 : -1;
+        if (dir > 0) { pickerMonth++; if (pickerMonth > 12) { pickerMonth = 1; pickerYear++; } }
+        else         { pickerMonth--; if (pickerMonth < 1)  { pickerMonth = 12; pickerYear--; } }
+        renderPicker(dir);
+      }
+    }, { passive: true });
   }
 
   renderPicker();
   document.body.appendChild(backdrop);
   document.body.appendChild(popup);
 }
+
+
+// =============================================
+// 날짜 입력칸(할일 날짜 / 반복 종료일) → 앱 디자인 달력으로 교체
+// =============================================
+//  - 기존 <input type="date">는 숨긴 채 값 저장용으로 그대로 둠
+//    → modal.js / repeat.js 등이 .value 를 읽고 쓰는 기존 로직은 그대로 작동 (형식 YYYY-MM-DD 유지)
+//  - 그 자리에 버튼을 만들어 "2026. 10. 25. (일)" 형식으로 표시, 누르면 앱 디자인 달력이 뜸
+//  - 코드에서 input.value 를 바꾸면(수정창 열기 등) 버튼 표시도 자동으로 갱신
+//  - 모바일: openCustomDatePicker (뒤로가기 시 달력만 닫힘 — app.js에 이미 등록된 id 사용)
+//  - PC   : pcPickDate (index-pc.html)
+const _CUSTOM_DATE_DOW = ['일','월','화','수','목','금','토'];
+
+function _formatCustomDateLabel(v) {
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return '';
+  const y = parseInt(v.slice(0, 4), 10);
+  const m = parseInt(v.slice(5, 7), 10);
+  const d = parseInt(v.slice(8, 10), 10);
+  const dow = new Date(y, m - 1, d).getDay();
+  return `${y}. ${String(m).padStart(2,'0')}. ${String(d).padStart(2,'0')}. (${_CUSTOM_DATE_DOW[dow]})`;
+}
+
+function _attachCustomDateInput(inputId, btnStyle) {
+  const input = document.getElementById(inputId);
+  if (!input || input.dataset.customDate === '1') return;
+  input.dataset.customDate = '1';
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.id = inputId + '-btn';
+  btn.className = 'custom-date-btn';
+  btn.style.cssText = btnStyle;
+  input.insertAdjacentElement('afterend', btn);
+  input.style.display = 'none';
+
+  // value 를 코드로 바꿀 때 버튼 표시도 함께 갱신 (값 자체는 원래 input에 그대로 저장)
+  const desc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+  const refresh = () => {
+    const label = _formatCustomDateLabel(desc.get.call(input));
+    btn.textContent = label || '날짜 선택';
+    btn.style.color = label ? 'var(--text-primary)' : 'var(--text-muted)';
+  };
+  Object.defineProperty(input, 'value', {
+    configurable: true,
+    get() { return desc.get.call(this); },
+    set(v) { desc.set.call(this, v); refresh(); }
+  });
+  refresh();
+
+  btn.addEventListener('click', e => {
+    e.preventDefault();
+    if (input.disabled || btn.disabled) return;
+    // 키보드가 올라와 있으면 내림 (달력 가림 방지)
+    try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch(_) {}
+
+    const cur  = desc.get.call(input);
+    const init = /^\d{4}-\d{2}-\d{2}$/.test(cur) ? cur : null;
+
+    const onSelect = (dateStr) => {
+      input.value = dateStr;
+      // 기본 달력에서 고를 때와 동일하게 이벤트 발생
+      input.dispatchEvent(new Event('input',  { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+
+    const isPcLayout = document.body.classList.contains('pc-layout');
+    if (isPcLayout && typeof pcPickDate === 'function') {
+      pcPickDate(null, false, init, onSelect, { backdrop: true, noHighlight: !init });
+    } else {
+      openCustomDatePicker(onSelect, init);
+    }
+  });
+}
+
+function initCustomDateInputs() {
+  // 할일 등록/수정 창의 날짜 칸 (기존 #input-date 스타일과 동일)
+  _attachCustomDateInput('input-date',
+    'flex:1 1 0;min-width:0;background:var(--bg-surface);border:1px solid var(--border-light);' +
+    'border-radius:var(--radius-sm);padding:8px 12px;font-size:13px;outline:none;' +
+    'text-align:left;cursor:pointer;font-family:inherit;line-height:normal;-webkit-appearance:none;appearance:none;');
+  // 반복 설정의 종료일 칸 (기존 .repeat-option input[type="date"] 스타일과 동일)
+  _attachCustomDateInput('repeat-end-date',
+    'flex:1;background:var(--bg-surface);border:1px solid var(--border-light);' +
+    'border-radius:var(--radius-sm);padding:6px 10px;font-size:13px;outline:none;' +
+    'text-align:left;cursor:pointer;font-family:inherit;line-height:normal;-webkit-appearance:none;appearance:none;');
+}
+
+// 이 스크립트는 body 끝에서 로드되므로 입력칸이 이미 존재 → 즉시 연결.
+// 혹시 없을 경우를 대비해 DOMContentLoaded에서 한 번 더 시도 (중복 연결은 내부에서 방지)
+initCustomDateInputs();
+document.addEventListener('DOMContentLoaded', initCustomDateInputs);
 
 
 // =============================================

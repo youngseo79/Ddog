@@ -259,6 +259,8 @@ function hasOpenPopup() {
   // ── 창고 탭 전용 팝업들 (storage.js가 동적 생성) ──
   if (document.getElementById('storage-action-popup')) return true;
   if (document.getElementById('storage-date-picker-popup')) return true;
+  // ── PC 날짜 선택 달력 (index-pc.html의 pcPickDate가 동적 생성) ──
+  if (document.getElementById('pc-date-picker-popup')) return true;
   if (document.getElementById('storage-pc-dropdown')) return true;
   if (!document.getElementById('repeat-overlay').classList.contains('hidden')) return true;
   if (!document.getElementById('action-popup').classList.contains('hidden')) return true;
@@ -315,6 +317,13 @@ function closeTopPopup() {
   if (storageDatePicker) {
     storageDatePicker.remove();
     document.getElementById('storage-date-picker-backdrop')?.remove();
+    return;
+  }
+  // ── PC 날짜 선택 달력 (할일 입력창/반복 설정창보다 위층이므로 먼저 닫기) ──
+  const pcDatePicker = document.getElementById('pc-date-picker-popup');
+  if (pcDatePicker) {
+    pcDatePicker.remove();
+    document.getElementById('pc-date-picker-backdrop')?.remove();
     return;
   }
   // ── 창고 액션 시트(모바일) / PC 드롭다운 ──
