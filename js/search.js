@@ -3,6 +3,7 @@
 // =============================================
 
 let searchTimer = null;
+let _searchSeq = 0;   // 늦게 도착한 이전 검색 결과가 최신 결과를 덮어쓰지 않도록
 
 function initSearch() {
   const input = document.getElementById('search-input');
@@ -14,6 +15,7 @@ function initSearch() {
   });
 
   clearBtn.addEventListener('click', () => {
+    _searchSeq++;
     input.value = '';
     document.getElementById('search-results').innerHTML = '';
     input.focus();
@@ -22,6 +24,7 @@ function initSearch() {
 
 async function runSearch(keyword) {
   const resultEl = document.getElementById('search-results');
+  const seq = ++_searchSeq;
   if (!keyword) {
     resultEl.innerHTML = '';
     return;
@@ -30,9 +33,23 @@ async function runSearch(keyword) {
   resultEl.innerHTML = '<div class="spinner"></div>';
 
   try {
-    const rows = await searchTodos(keyword);
+    // 현재 모드 + 다른 모드(일반/업무) 결과를 함께 표시
+    const curMode = (typeof APP_MODE !== 'undefined') ? APP_MODE : 'personal';
+    const [curRows, otherRows] = await Promise.all([
+      searchTodos(keyword),
+      (typeof searchOtherModeTodos === 'function')
+        ? searchOtherModeTodos(keyword).catch(e => { console.warn('[search] 다른 모드 검색 실패', e); return []; })
+        : Promise.resolve([]),
+    ]);
+    if (seq !== _searchSeq) return;
+    const rows = [...curRows.map(r => ({ ...r, _mode: curMode })), ...otherRows]
+      .sort((a, b) => {
+        if (a.date !== b.date) return b.date > a.date ? 1 : -1;
+        return (b.created_at || '') > (a.created_at || '') ? 1 : -1;
+      });
     renderSearchResults(rows, keyword);
   } catch(e) {
+    if (seq !== _searchSeq) return;
     resultEl.innerHTML = '<div class="empty-state">검색 실패</div>';
     console.error(e);
   }
@@ -78,12 +95,25 @@ function makeSearchItem(todo, keyword, isDone) {
   } else {
     dateEl.textContent = formatDateKor(todo.date);
   }
+  // 업무 항목 표시
+  if (todo._mode === 'work') {
+    const badge = document.createElement('span');
+    badge.className = 's-mode-badge';
+    badge.textContent = '업무';
+    dateEl.prepend(badge);
+  }
 
   li.appendChild(titleEl);
   li.appendChild(dateEl);
 
   // 클릭 → 해당 탭으로 이동
   li.addEventListener('click', () => {
+    // 다른 모드 항목 → 그 모드로 전환 후 해당 날짜(또는 창고)로 이동
+    const curMode = (typeof APP_MODE !== 'undefined') ? APP_MODE : 'personal';
+    if (todo._mode && todo._mode !== curMode && typeof switchAppMode === 'function') {
+      switchAppMode(todo._mode, todo.storage_flag ? { tab: 'storage' } : { tab: 'todo', date: todo.date });
+      return;
+    }
     if (todo.storage_flag) {
       switchTab('storage');
     } else {

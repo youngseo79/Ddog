@@ -4,7 +4,11 @@
 
 const SUPABASE_URL  = 'https://trufhkgiorgnabfppztw.supabase.co';
 const SUPABASE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRydWZoa2dpb3JnbmFiZnBwenR3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc1MzcxNzUsImV4cCI6MjA5MzExMzE3NX0.zsrG9HOrE3av7lgB7tUls9igCdAkelh_nsF7buP6DXk';
-const TABLE_NAME    = 'ddog';
+// ── 모드(일반/업무) ──
+// 접속·새로고침 시 항상 일반 모드로 시작
+// (실행 중 전환은 workmode.js가 APP_MODE / TABLE_NAME 값을 바꿔서 처리)
+let APP_MODE = 'personal';
+let TABLE_NAME      = APP_MODE === 'work' ? 'ddog_work' : 'ddog';
 
 // Supabase REST 클라이언트
 const DB = {

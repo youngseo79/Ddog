@@ -2,12 +2,18 @@
 // sync.js — 로컬캐시(IndexedDB) + 동기화 엔진
 // =============================================
 
-const IDB_NAME    = 'ddog-cache';
+// 업무 모드는 별도 로컬DB 사용 (할일·대기 큐 모두 일반과 완전 분리)
+let   IDB_NAME    = (typeof APP_MODE !== 'undefined' && APP_MODE === 'work') ? 'ddog-cache-work' : 'ddog-cache';
 const IDB_VERSION = 1;
 const STORE_TODOS = 'todos';
 const STORE_QUEUE = 'pending_queue';
 
 let idb = null;
+
+// 모드(일반/업무) 전환 세대 번호 — workmode.js가 전환할 때마다 1 증가.
+// 백그라운드 작업(동기화·큐 전송·실시간)이 시작할 때의 번호와 지금 번호가 다르면
+// 이전 모드 작업이므로 기기 저장소에 쓰지 않고 중단 (일반/업무 데이터 섞임 방지)
+let _syncGen = 0;
 
 // ── IndexedDB 초기화 ──
 function openIDB() {
@@ -221,6 +227,7 @@ async function sbFetch(path, options = {}) {
 // 페이지네이션으로 전체 데이터를 가져옴 (Supabase 기본 1000개 제한 우회)
 
 async function initialSync() {
+  const gen = _syncGen;
   try {
     let allRows = [];
     let offset = 0;
@@ -232,6 +239,7 @@ async function initialSync() {
       if (page.length < pageSize) break;
       offset += pageSize;
     }
+    if (gen !== _syncGen) return;
     if (allRows.length > 0) {
       await idbClear();
       await idbPutMany(allRows);
@@ -256,14 +264,17 @@ function flushQueue() {
 }
 
 async function _flushQueueInner() {
+  const gen = _syncGen;
   const ops = await queueGetAll();
   if (!ops.length) return;
 
   let changed = false;
 
   for (const listed of ops) {
+    if (gen !== _syncGen) break;   // 모드가 바뀜 → 남은 항목은 그 모드로 돌아왔을 때 전송
     // 최신 상태로 다시 읽기 (그 사이 병합/취소/id 교체가 있었을 수 있음)
     const op = await queueGet(listed.qid);
+    if (gen !== _syncGen) break;
     if (!op) continue;
 
     // 경로에 아직 진짜 id로 안 바뀐 tmp id가 있으면 처리
@@ -283,7 +294,7 @@ async function _flushQueueInner() {
 
     try {
       if (op.method === 'POST' && op.body) {
-        const ok = await _flushPost(op);
+        const ok = await _flushPost(op, gen);
         if (ok) changed = true;
       } else {
         const body = (op.body && op.body.updated_at)
@@ -294,6 +305,7 @@ async function _flushQueueInner() {
           body: body ? JSON.stringify(body) : undefined,
           signal: _timeoutSignal(FLUSH_TIMEOUT_MS)
         });
+        if (gen !== _syncGen) break;   // 전송 중 모드가 바뀜 → 큐 삭제는 다른 모드 큐를 건드리지 않도록 생략
         await queueDelete(op.qid);
       }
     } catch(e) {
@@ -302,13 +314,13 @@ async function _flushQueueInner() {
     }
   }
 
-  if (changed) {
+  if (changed && gen === _syncGen) {
     refreshCurrentTab();
     updateMonthDots();
   }
 }
 
-async function _flushPost(op) {
+async function _flushPost(op, gen = _syncGen) {
   const sentRev = op.rev || 0;
   const now = new Date().toISOString();
 
@@ -357,12 +369,17 @@ async function _flushPost(op) {
     if (!real) throw new Error('POST 응답에 행 없음');
   }
 
+  // 전송 중 모드가 바뀜 → 기기 저장은 하지 않음
+  // (큐 항목이 남아 있다가 그 모드에서 다시 전송될 때 1)의 중복 확인으로 같은 행을 찾아 처리됨)
+  if (gen !== _syncGen) return false;
+
   // 3) 진짜 행 저장 + 매핑 등록 (이후 수정/삭제는 진짜 id로 감)
   await idbPut(real);
   if (tmpId) _tmpIdMap.set(tmpId, real.id);
 
   // 4) 전송하는 동안 로컬에서 수정/삭제가 있었는지 확인
   const latest = await queueGet(op.qid);
+  if (gen !== _syncGen) return false;
   if (!latest) {
     // 전송 중에 사용자가 삭제함 → 서버에서도 삭제
     await sbFetch(`${TABLE_NAME}?id=eq.${real.id}`, {
@@ -377,6 +394,7 @@ async function _flushPost(op) {
         body: JSON.stringify({ ...rest, updated_at: new Date().toISOString() }),
         signal: _timeoutSignal(FLUSH_TIMEOUT_MS)
       });
+      if (gen !== _syncGen) return false;
       if (rows && rows[0]) { real = rows[0]; await idbPut(real); }
     }
     await queueDelete(op.qid);
@@ -501,6 +519,9 @@ async function startRealtime() {
 
 async function handleRealtimeEvent(payload) {
   const { eventType, new: newRow, old: oldRow } = payload;
+  // 다른 모드 테이블의 이벤트(전환 직후 이전 채널에서 늦게 온 것)는 무시
+  if (payload && payload.table && payload.table !== TABLE_NAME) return;
+  const gen = _syncGen;
 
   if (eventType === 'INSERT') {
     if (newRow && newRow.id) {
@@ -513,6 +534,7 @@ async function handleRealtimeEvent(payload) {
     if (updateId) {
       try {
         const rows = await sbFetch(`${TABLE_NAME}?id=eq.${updateId}`);
+        if (gen !== _syncGen) return;
         if (rows && rows.length > 0) {
           await idbPut(rows[0]);
         } else if (newRow) {
@@ -520,6 +542,7 @@ async function handleRealtimeEvent(payload) {
           await idbPut(newRow);
         }
       } catch(e) {
+        if (gen !== _syncGen) return;
         // 네트워크 실패 시 newRow로 fallback
         if (newRow) await idbPut(newRow);
         console.warn('[realtime] UPDATE 재조회 실패, newRow fallback:', e);
@@ -538,6 +561,7 @@ async function handleRealtimeEvent(payload) {
     }
   }
 
+  if (gen !== _syncGen) return;
   refreshCurrentTab();
   updateMonthDots();
 }
@@ -546,6 +570,7 @@ async function handleRealtimeEvent(payload) {
 // 1000개 제한 우회: 페이지 단위로 전부 가져옴
 // 아직 서버에 안 올라간 tmp 행은 지우지 않고 유지
 async function fullResync() {
+  const gen = _syncGen;
   try {
     let rows = [];
     let offset = 0;
@@ -557,7 +582,9 @@ async function fullResync() {
       if (page.length < pageSize) break;
       offset += pageSize;
     }
+    if (gen !== _syncGen) return;
     const tmps = (await idbGetAll()).filter(t => String(t.id).startsWith('tmp_'));
+    if (gen !== _syncGen) return;
     await idbClear();
     const merged = rows.concat(tmps);
     if (merged.length > 0) await idbPutMany(merged);
@@ -620,6 +647,7 @@ async function initSync() {
 // ── 백그라운드 동기화 ──
 // updated_at 변경분 + 삭제된 항목 감지를 위해 Supabase 전체 id 목록과 비교
 async function bgSync() {
+  const gen = _syncGen;
   const all = await idbGetAll();
   if (!all.length) return;
 
@@ -634,6 +662,7 @@ async function bgSync() {
     const updated = await sbFetch(
       `${TABLE_NAME}?updated_at=gte.${encodeURIComponent(latest)}&order=updated_at.asc`
     );
+    if (gen !== _syncGen) return;   // 조회 중 모드가 바뀜 → 이번 동기화 중단
     if (updated && updated.length > 0) {
       // IDB와 실제로 다른 행만 저장 (gte 조회로 인한 중복 방지)
       const idbMap = new Map(all.map(t => [t.id, t]));
@@ -674,6 +703,7 @@ async function bgSync() {
     const pageSize = 1000;
     while (true) {
       const page = await sbFetch(`${TABLE_NAME}?select=id,updated_at,repeat_master_id&order=id.asc&limit=${pageSize}&offset=${offset}`);
+      if (gen !== _syncGen) return;
       if (!page || page.length === 0) break;
       sbList = sbList.concat(page);
       if (page.length < pageSize) break;
@@ -682,6 +712,7 @@ async function bgSync() {
 
     if (sbList.length > 0) {
       const idbAll = await idbGetAll();
+      if (gen !== _syncGen) return;
       const idbMap = new Map(idbAll.map(t => [String(t.id), t]));
       const toTime = v => (v ? (Date.parse(v) || 0) : 0);
 
@@ -705,6 +736,7 @@ async function bgSync() {
         const results = await Promise.all(chunks.map(ids =>
           sbFetch(`${TABLE_NAME}?id=in.(${ids.join(',')})`)
         ));
+        if (gen !== _syncGen) return;
         const rows = results.flat().filter(Boolean);
         if (rows.length > 0) await idbPutMany(rows);
       }
@@ -717,6 +749,7 @@ async function bgSync() {
         snapshotIds.has(t.id) &&
         !sbIdSet.has(String(t.id))
       );
+      if (gen !== _syncGen) return;
       if (deletedLocally.length > 0) {
         await Promise.all(deletedLocally.map(t => idbDelete(t.id)));
       }
@@ -725,6 +758,7 @@ async function bgSync() {
     console.warn('[sync] 목록 비교 동기화 실패', e);
   }
 
+  if (gen !== _syncGen) return;
   refreshCurrentTab();
   updateMonthDots();
 }

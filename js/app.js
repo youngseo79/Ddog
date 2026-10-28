@@ -38,6 +38,8 @@ async function bootApp() {
   initLightMode();
   loadTodos();
   initBackButton();
+  // 일반↔업무 전환 직후: 이동 목적지(탭/날짜)가 있으면 적용 (workmode.js)
+  if (typeof applyModeTarget === 'function') applyModeTarget();
 
   // ── 첫 접속 시 오늘의 시간 일정 팝업 ──
   // 스플래시가 걷히기 전에 팝업을 미리 깔아둠 → 스플래시가 사라지면 바로 팝업이 보임
