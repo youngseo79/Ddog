@@ -242,6 +242,9 @@ ul { list-style: none; }
 .nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: var(--text-muted); font-size: 10px; font-family: var(--font-ui); transition: color 0.15s; height: 100%; }
 .nav-btn svg { width: 22px; height: 22px; }
 .nav-btn.active { color: var(--accent); }
+/* 모바일 하단 탭: PC처럼 선택된 탭에 음영 + 강조선 (화면 쪽인 위에 표시) */
+#bottom-nav .nav-btn { transition: color 0.15s, background 0.15s, box-shadow 0.15s; }
+#bottom-nav .nav-btn.active { background: var(--accent-glow); box-shadow: inset 0 2.5px 0 var(--accent); }
 
 /* ── FAB ── */
 #fab-add {
