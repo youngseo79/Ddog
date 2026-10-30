@@ -219,38 +219,61 @@ async function _doSwitchAppMode(mode, target) {
 
   document.body.classList.toggle('mode-work', mode === 'work');
 
-  // 6) 화면 즉시 전환 (기기에 저장된 데이터로 바로 표시)
-  _openTarget(target);
-
-  // 7) 실시간 연결을 새 테이블로
-  try { startRealtime(); } catch (e) {}
-
-  // 8) 백그라운드 최신화: 이 기기에서 처음 여는 모드면 전체 다운로드, 아니면 변경분만
+  // 6) 동기화 먼저 → 끝난 뒤 화면 전환 (앱 시작 시와 같은 방식)
+  //    - 처음 여는 모드면 전체 다운로드, 아니면 bgSync 1단계(최근 변경분)까지 기다림 (최대 3초)
+  //    - bgSync 2단계(전체 대조)·큐 전송은 화면 전환 후 뒤에서 계속 진행, 끝나면 화면 자동 갱신
+  //    - 기다리는 동안 이전 화면 클릭 차단 (이전 모드 항목이 새 모드로 저장되는 일 방지)
+  let _quickDone;
+  const quickSync = new Promise(r => { _quickDone = r; });
   (async () => {
     try {
       const rows = await idbGetAll();
       if (gen !== _syncGen || !AppState.isOnline) return;
       if (rows.length === 0) {
         await initialSync();
+        _quickDone();
         if (gen === _syncGen) { refreshCurrentTab(); updateMonthDots(); }
       } else {
-        await bgSync();
+        await bgSync(_quickDone);
       }
       if (gen === _syncGen) await flushQueue();
     } catch (e) {
       console.warn('[workmode] 전환 후 동기화 실패', e);
+    } finally {
+      _quickDone();   // 오프라인·실패·중단 시에도 대기 반드시 해제
     }
   })();
+
+  // 7) 실시간 연결을 새 테이블로
+  try { startRealtime(); } catch (e) {}
+
+  // 팝업용 서버 조회는 동기화 대기와 동시에 미리 출발 (업무 모드를 처음 열 때만)
+  const needTimedPopup = mode === 'work' && !_workTimedPopupShown && !_workTimedPopupBuilding;
+  const timedServerPromise = needTimedPopup ? fetchTimedTodosFromServer() : null;
+
+  const blocker = document.createElement('div');
+  blocker.id = 'mode-switch-blocker';
+  blocker.style.cssText = 'position:fixed;inset:0;z-index:20000;background:transparent;';
+  document.body.appendChild(blocker);
+  try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch (e) {}
+  try {
+    await Promise.race([quickSync, _sleep(3000)]);
+  } finally {
+    blocker.remove();
+  }
+
+  // 8) 화면 전환 (최신화된 기기 데이터로 표시)
+  if (gen === _syncGen) _openTarget(target);
 
   // 9) '오늘의 시간 일정' 팝업: 업무 모드를 처음 열 때 한 번만
   //    (일반 모드는 접속 시 app.js가 이미 표시. 이후 탭 이동에서는 표시 안 함, 새로고침하면 초기화)
   //    기다리지 않고 따로 진행 → 팝업 준비 중에도 다른 탭으로 바로 이동 가능.
   //    준비 중에 업무를 벗어나면 이번엔 띄우지 않고, 다음에 업무를 열 때 띄움
-  if (mode !== 'work' || _workTimedPopupShown || _workTimedPopupBuilding) return;
+  if (!needTimedPopup || gen !== _syncGen || _workTimedPopupShown || _workTimedPopupBuilding) return;
   _workTimedPopupBuilding = true;
   (async () => {
     try {
-      const timed = await buildTimedTodosForPopup(fetchTimedTodosFromServer());
+      const timed = await buildTimedTodosForPopup(timedServerPromise);
       if (gen === _syncGen) {
         _workTimedPopupShown = true;
         showTimedTodosPopup(timed);
