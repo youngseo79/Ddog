@@ -36,6 +36,15 @@ async function bootApp() {
   initTabs();
   initTheme();
   initLightMode();
+  // ── 동기화 먼저: 스플래시가 떠 있는 동안 최신 데이터를 받은 뒤 화면/팝업 구성 ──
+  // (기기 데이터가 있을 때의 bgSync 1단계(최근 변경분)를 최대 3초까지 기다림.
+  //  초과/실패 시 기기 데이터로 진행, 나머지 동기화가 끝나면 기존처럼 화면이 자동 갱신됨)
+  if (_bootSyncPromise) {
+    await Promise.race([
+      _bootSyncPromise,
+      new Promise(r => setTimeout(r, 3000)),
+    ]);
+  }
   loadTodos();
   initBackButton();
   // 일반↔업무 전환 직후: 이동 목적지(탭/날짜)가 있으면 적용 (workmode.js)
@@ -68,11 +77,22 @@ async function fetchTimedTodosFromServer() {
   if (!AppState.isOnline) return null;
   const today = toLocalDateStr(new Date());
   try {
-    const path = `${TABLE_NAME}?date=eq.${today}&time_at=not.is.null&is_done=eq.false`;
-    return await Promise.race([
-      sbFetch(path, { signal: _timeoutSignal(3000) }),
+    // 미완료 시간 일정 + 오늘의 반복 예외 행(완료 포함)
+    // → 다른 기기에서 완료한 반복 일정도 팝업에서 제외되도록
+    const path = `${TABLE_NAME}?date=eq.${today}&or=(and(time_at.not.is.null,is_done.eq.false),repeat_exception.eq.true)`;
+    // 서버에 현재 존재하는 반복 마스터 id 목록 (다른 기기에서 반복 일정 자체를 삭제한 경우 대비)
+    // → 이 조회만 실패하면 마스터 확인 없이 진행 (기존 방식)
+    const masterPath = `${TABLE_NAME}?select=id&repeat_type=neq.none&repeat_master_id=is.null`;
+    const rowsP    = sbFetch(path, { signal: _timeoutSignal(3000) });
+    const mastersP = sbFetch(masterPath, { signal: _timeoutSignal(3000) }).catch(() => null);
+    const [rows, masters] = await Promise.race([
+      Promise.all([rowsP, mastersP]),
       new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 3000)),
     ]);
+    return {
+      rows,
+      masterIds: Array.isArray(masters) ? new Set(masters.map(m => String(m.id))) : null,
+    };
   } catch(e) {
     console.warn('[app] 시간 일정 서버 조회 실패 → 기기 데이터 사용', e);
     return null;
@@ -84,7 +104,9 @@ async function buildTimedTodosForPopup(serverPromise) {
   const today = toLocalDateStr(new Date());
   const isTimedUndone = t => t && t.time_at && !t.is_done && !t.storage_flag && t.date === today;
 
-  const serverRows = await serverPromise;
+  const server = await serverPromise;
+  const serverRows      = server ? server.rows : null;
+  const serverMasterIds = server ? server.masterIds : null;
 
   let localRows = [];
   try {
@@ -114,6 +136,8 @@ async function buildTimedTodosForPopup(serverPromise) {
   // 반복 일정: 마스터 행(시작일 날짜로 저장됨)은 직접 행에서 제외하고,
   // 오늘에 해당하는 반복 일정을 가상 행으로 계산해 추가 (todo.js 렌더링과 동일한 방식)
   // → 시작일 이후 반복일에도 팝업에 표시, 오늘 완료/삭제/개별 수정된 날은 예외 행 기준으로 처리
+  // 예외 행(완료·이 날만 삭제 포함)은 걸러내기 전에 따로 보관 → 반복 가상 행 제외 판단에 사용
+  const resultExceptions = result.filter(t => t && t.repeat_exception === true);
   result = result.filter(t => {
     if (!t) return false;
     if (t.repeat_deleted) return false;
@@ -121,10 +145,16 @@ async function buildTimedTodosForPopup(serverPromise) {
     return true;
   });
   try {
-    const repeatMasters = await fetchRepeatMasters(today);
+    let repeatMasters = await fetchRepeatMasters(today);
+    // 서버에서 이미 삭제된 반복 마스터는 제외 (이 기기의 아직 미전송 새 마스터(tmp)는 유지)
+    if (serverMasterIds) {
+      repeatMasters = (repeatMasters || []).filter(m =>
+        String(m.id).startsWith('tmp_') || serverMasterIds.has(String(m.id))
+      );
+    }
     const localExceptions = await fetchRepeatExceptions(today);
     const exceptionIds = new Set(
-      [...(localExceptions || []), ...result.filter(t => t.repeat_exception === true)]
+      [...(localExceptions || []), ...resultExceptions]
         .map(e => String(e.repeat_master_id))
     );
     const virtualRows = (repeatMasters || [])

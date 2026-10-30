@@ -597,6 +597,9 @@ async function fullResync() {
 
 // ── 앱 시작 시 호출 ──
 
+// 앱 시작 시 bgSync 진행 상태 (bootApp에서 화면을 그리기 전에 최대 3초 기다림)
+let _bootSyncPromise = null;
+
 async function initSync() {
   await getIDB();
 
@@ -610,10 +613,17 @@ async function initSync() {
     // [수정 ②] bgSync 실패 시 콘솔 경고만 내고 조용히 넘어가던 것을
     //           실패해도 refreshCurrentTab/updateMonthDots는 반드시 호출되도록 보장
     if (AppState.isOnline) {
-      bgSync().catch(e => {
-        console.warn('[sync] bg sync 실패', e);
-        refreshCurrentTab();
-        updateMonthDots();
+      // 스플래시는 bgSync 1단계(최근 변경분 받기)까지만 기다림
+      // → 2단계(전체 목록 대조: 삭제·시계 오차 보정)는 뒤에서 계속 진행 후 화면 자동 갱신
+      // (1단계 전에 끝나거나 실패해도 finally로 반드시 대기 해제)
+      _bootSyncPromise = new Promise(resolve => {
+        bgSync(resolve)
+          .catch(e => {
+            console.warn('[sync] bg sync 실패', e);
+            refreshCurrentTab();
+            updateMonthDots();
+          })
+          .finally(resolve);
       });
     }
   }
@@ -646,7 +656,8 @@ async function initSync() {
 
 // ── 백그라운드 동기화 ──
 // updated_at 변경분 + 삭제된 항목 감지를 위해 Supabase 전체 id 목록과 비교
-async function bgSync() {
+// onQuickDone: 1단계(최근 변경분 받기) 완료 시 호출할 콜백 (앱 시작 시에만 사용, 생략 가능)
+async function bgSync(onQuickDone) {
   const gen = _syncGen;
   const all = await idbGetAll();
   if (!all.length) return;
@@ -675,6 +686,9 @@ async function bgSync() {
       }
     }
   }
+
+  // 1단계 완료 알림 → 앱 시작 시 스플래시 대기 해제 (2단계는 이어서 진행)
+  if (typeof onQuickDone === 'function') onQuickDone();
 
   // 2. Supabase 전체 목록(id, updated_at)과 IDB 비교
   //    - 서버에만 있는 행 → 받아와서 채움 (다른 기기 등록분을 놓친 경우)
