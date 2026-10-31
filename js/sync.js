@@ -40,9 +40,25 @@ async function getIDB() {
 }
 
 // ── IDB CRUD helpers ──
+// [메모리 캐시] 할일 목록을 한 번 읽어 메모리에 두고 재사용
+// - 화면을 그릴 때마다 기기 저장소 전체를 여러 번 통째로 읽던 부담 제거
+// - 쓰기(저장·수정·삭제)는 지금처럼 기기 저장소에 먼저 기록하고, 성공하면 캐시도 같이 갱신
+// - 캐시는 로컬DB 연결(일반/업무)마다 따로 보관 → 두 모드 데이터가 섞이지 않음
+// - 꺼내 줄 때는 행마다 복사본을 줌 → 받은 쪽에서 값을 바꿔도 캐시는 그대로 (기존 동작과 동일)
+// - 순서도 기기 저장소의 기존 순서(id 순)와 똑같이 맞춤
 
-async function idbGetAll() {
-  const db = await getIDB();
+const _todoCaches = new WeakMap();   // 로컬DB 연결 → { map, arr, loading, dirty }
+
+function _cacheEntry(db) {
+  let e = _todoCaches.get(db);
+  if (!e) {
+    e = { map: null, arr: null, loading: null, dirty: false };
+    _todoCaches.set(db, e);
+  }
+  return e;
+}
+
+function _rawGetAll(db) {
   return new Promise((resolve, reject) => {
     const tx  = db.transaction(STORE_TODOS, 'readonly');
     const req = tx.objectStore(STORE_TODOS).getAll();
@@ -51,14 +67,74 @@ async function idbGetAll() {
   });
 }
 
+// 캐시 준비 (없으면 기기 저장소에서 한 번 읽음, 동시에 여러 번 불려도 읽기는 1번)
+async function _ensureCache(db) {
+  const e = _cacheEntry(db);
+  if (e.map) return e;
+  if (e.loading) return e.loading;
+  e.loading = (async () => {
+    try {
+      while (true) {
+        e.dirty = false;
+        const rows = await _rawGetAll(db);
+        // 읽는 도중에 쓰기가 있었으면 다시 읽음 (그 쓰기가 빠진 목록을 캐시하지 않도록)
+        if (e.dirty) continue;
+        e.map = new Map(rows.map(r => [r.id, r]));
+        e.arr = rows;
+        return e;
+      }
+    } finally {
+      e.loading = null;
+    }
+  })();
+  return e.loading;
+}
+
+// 쓰기 성공 후 캐시 반영 (캐시가 아직 없으면 건너뜀, 읽는 중이면 다시 읽도록 표시)
+function _cacheApply(db, fn) {
+  const e = _cacheEntry(db);
+  if (e.map) {
+    fn(e.map);
+    e.arr = null;   // 순서 목록은 다음 읽기 때 다시 만듦
+  } else if (e.loading) {
+    e.dirty = true;
+  }
+}
+
+// 캐시 버리기 (다음 읽기 때 기기 저장소에서 새로 읽음)
+function _cacheInvalidate(db) {
+  if (!db) return;
+  const e = _cacheEntry(db);
+  e.map = null;
+  e.arr = null;
+  if (e.loading) e.dirty = true;
+}
+
+// 화면이 다시 보일 때 캐시를 한 번 새로 읽음
+// → 같은 기기에서 앱을 여러 창(탭)으로 열어둔 경우, 다른 창에서 기기 저장소에 쓴 내용도 반영
+//   (기존에는 매번 기기 저장소에서 읽었으므로 같은 결과 유지)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') _cacheInvalidate(idb);
+});
+
+function _cacheSortedRows(e) {
+  if (!e.arr) {
+    e.arr = Array.from(e.map.values()).sort((a, b) => indexedDB.cmp(a.id, b.id));
+  }
+  return e.arr;
+}
+
+async function idbGetAll() {
+  const db = await getIDB();
+  const e  = await _ensureCache(db);
+  return _cacheSortedRows(e).map(r => ({ ...r }));
+}
+
 async function idbGet(id) {
   const db = await getIDB();
-  return new Promise((resolve, reject) => {
-    const tx  = db.transaction(STORE_TODOS, 'readonly');
-    const req = tx.objectStore(STORE_TODOS).get(id);
-    req.onsuccess = () => resolve(req.result || null);
-    req.onerror   = () => reject(req.error);
-  });
+  const e  = await _ensureCache(db);
+  const r  = e.map.get(id);
+  return r ? { ...r } : null;
 }
 
 async function idbPut(todo) {
@@ -66,7 +142,11 @@ async function idbPut(todo) {
   return new Promise((resolve, reject) => {
     const tx  = db.transaction(STORE_TODOS, 'readwrite');
     const req = tx.objectStore(STORE_TODOS).put(todo);
-    req.onsuccess = () => resolve();
+    req.onsuccess = () => {
+      const copy = { ...todo };
+      _cacheApply(db, m => m.set(copy.id, copy));
+      resolve();
+    };
     req.onerror   = () => reject(req.error);
   });
 }
@@ -76,8 +156,12 @@ async function idbPutMany(todos) {
   return new Promise((resolve, reject) => {
     const tx    = db.transaction(STORE_TODOS, 'readwrite');
     const store = tx.objectStore(STORE_TODOS);
+    const copies = todos.map(t => ({ ...t }));
     todos.forEach(t => store.put(t));
-    tx.oncomplete = () => resolve();
+    tx.oncomplete = () => {
+      _cacheApply(db, m => copies.forEach(c => m.set(c.id, c)));
+      resolve();
+    };
     tx.onerror    = () => reject(tx.error);
   });
 }
@@ -87,7 +171,10 @@ async function idbDelete(id) {
   return new Promise((resolve, reject) => {
     const tx  = db.transaction(STORE_TODOS, 'readwrite');
     const req = tx.objectStore(STORE_TODOS).delete(id);
-    req.onsuccess = () => resolve();
+    req.onsuccess = () => {
+      _cacheApply(db, m => m.delete(id));
+      resolve();
+    };
     req.onerror   = () => reject(req.error);
   });
 }
@@ -97,7 +184,10 @@ async function idbClear() {
   return new Promise((resolve, reject) => {
     const tx  = db.transaction(STORE_TODOS, 'readwrite');
     const req = tx.objectStore(STORE_TODOS).clear();
-    req.onsuccess = () => resolve();
+    req.onsuccess = () => {
+      _cacheApply(db, m => m.clear());
+      resolve();
+    };
     req.onerror   = () => reject(req.error);
   });
 }
@@ -482,6 +572,7 @@ async function startRealtime() {
 
   // 채널 이름에 타임스탬프를 붙여 매번 고유하게 생성
   const channelName = `ddog-changes-${Date.now()}`;
+  const chGen = _syncGen;   // 이 채널이 속한 모드 세대
 
   realtimeChannel = client
     .channel(channelName)
@@ -493,6 +584,9 @@ async function startRealtime() {
       }
     )
     .subscribe(status => {
+      // 모드 전환으로 제거된 이전 모드 채널의 상태 알림(CLOSED 등)은 무시
+      // → 전환 직후 불필요한 중복 bgSync(화면 그리기와 경합)와 15초 뒤 재연결 예약 방지
+      if (chGen !== _syncGen) return;
       if (status === 'SUBSCRIBED') {
         // 정상 연결 — 혹시 남아있던 재시작 예약 취소
         if (realtimeRestartTimer) {

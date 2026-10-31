@@ -160,14 +160,17 @@ function switchAppMode(mode, target) {
   return _modeSwitchChain;
 }
 
+// 반환: 화면 그리기 완료 시점 (없으면 null)
 function _openTarget(target) {
   const tab = (target && target.tab) || 'todo';
   if (tab === 'todo') {
-    switchTab('todo');
+    const rendered = switchTab('todo');
     if (target && target.date) selectDate(target.date);
+    return rendered;
   } else if (document.getElementById(`tab-${tab}`)) {
-    switchTab(tab);
+    return switchTab(tab);
   }
+  return null;
 }
 
 async function _doSwitchAppMode(mode, target) {
@@ -219,14 +222,24 @@ async function _doSwitchAppMode(mode, target) {
 
   document.body.classList.toggle('mode-work', mode === 'work');
 
-  // 6) 동기화 먼저 → 끝난 뒤 화면 전환 (앱 시작 시와 같은 방식)
-  //    - 처음 여는 모드면 전체 다운로드, 아니면 bgSync 1단계(최근 변경분)까지 기다림 (최대 3초)
-  //    - bgSync 2단계(전체 대조)·큐 전송은 화면 전환 후 뒤에서 계속 진행, 끝나면 화면 자동 갱신
-  //    - 기다리는 동안 이전 화면 클릭 차단 (이전 모드 항목이 새 모드로 저장되는 일 방지)
+  // 업무 모드를 처음 여는 때(시간 일정 팝업이 뜨는 때)인지
+  const needTimedPopup = mode === 'work' && !_workTimedPopupShown && !_workTimedPopupBuilding;
+
+  // 업무 첫 클릭이 아니면: 기존처럼 화면부터 즉시 전환 (동기화는 그 뒤에 출발
+  //  → 화면용 기기 데이터 읽기가 동기화용 읽기보다 먼저 처리되어 지연 없음)
+  const renderDone = needTimedPopup ? null : _openTarget(target);
+
+  // 6) 백그라운드 최신화: 이 기기에서 처음 여는 모드면 전체 다운로드, 아니면 변경분만
+  //    - 업무 첫 클릭(시간 일정 팝업이 뜨는 때)만 동기화 1단계까지 기다린 뒤 화면 전환 (최대 3초)
+  //      → 팝업·첫 화면이 최신 데이터로 표시됨. 기다리는 동안 이전 화면 클릭 차단
+  //    - 그 외 탭 이동은 기존처럼 즉시 화면 전환, 동기화는 뒤에서 진행 후 화면 자동 갱신
   let _quickDone;
   const quickSync = new Promise(r => { _quickDone = r; });
   (async () => {
     try {
+      // 화면을 다 그린 뒤에 동기화 출발 (화면용 기기 데이터 읽기가 동기화의 큰 읽기 뒤로 밀리지 않게)
+      // 혹시 완료 신호가 없어도 최대 1.5초 뒤에는 출발
+      if (renderDone) await Promise.race([Promise.resolve(renderDone).catch(() => {}), _sleep(1500)]);
       const rows = await idbGetAll();
       if (gen !== _syncGen || !AppState.isOnline) return;
       if (rows.length === 0) {
@@ -248,22 +261,22 @@ async function _doSwitchAppMode(mode, target) {
   try { startRealtime(); } catch (e) {}
 
   // 팝업용 서버 조회는 동기화 대기와 동시에 미리 출발 (업무 모드를 처음 열 때만)
-  const needTimedPopup = mode === 'work' && !_workTimedPopupShown && !_workTimedPopupBuilding;
   const timedServerPromise = needTimedPopup ? fetchTimedTodosFromServer() : null;
 
-  const blocker = document.createElement('div');
-  blocker.id = 'mode-switch-blocker';
-  blocker.style.cssText = 'position:fixed;inset:0;z-index:20000;background:transparent;';
-  document.body.appendChild(blocker);
-  try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch (e) {}
-  try {
-    await Promise.race([quickSync, _sleep(3000)]);
-  } finally {
-    blocker.remove();
+  if (needTimedPopup) {
+    const blocker = document.createElement('div');
+    blocker.id = 'mode-switch-blocker';
+    blocker.style.cssText = 'position:fixed;inset:0;z-index:20000;background:transparent;';
+    document.body.appendChild(blocker);
+    try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch (e) {}
+    try {
+      await Promise.race([quickSync, _sleep(3000)]);
+    } finally {
+      blocker.remove();
+    }
+    // 8) 업무 첫 클릭: 동기화 1단계 후 최신화된 데이터로 화면 전환
+    if (gen === _syncGen) _openTarget(target);
   }
-
-  // 8) 화면 전환 (최신화된 기기 데이터로 표시)
-  if (gen === _syncGen) _openTarget(target);
 
   // 9) '오늘의 시간 일정' 팝업: 업무 모드를 처음 열 때 한 번만
   //    (일반 모드는 접속 시 app.js가 이미 표시. 이후 탭 이동에서는 표시 안 함, 새로고침하면 초기화)

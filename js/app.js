@@ -399,10 +399,13 @@ function switchTab(tabName) {
   document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tab === tabName);
   });
-  if (tabName === 'todo')        { loadTodos(); updateMonthDots(); }
-  else if (tabName === 'weekly') { weekOffset = 0; loadWeekly(); }
-  else if (tabName === 'storage'){ loadStorage(); }
+  // 화면 그리기 완료 시점을 반환 (모드 전환 시 workmode.js가 그린 뒤에 동기화를 시작하는 데 사용)
+  let rendered = null;
+  if (tabName === 'todo')        { rendered = Promise.all([loadTodos(), updateMonthDots()]); }
+  else if (tabName === 'weekly') { weekOffset = 0; rendered = loadWeekly(); }
+  else if (tabName === 'storage'){ rendered = loadStorage(); }
   else if (tabName === 'search') { setTimeout(() => document.getElementById('search-input').focus(), 200); }
+  return rendered;
 }
 
 function refreshCurrentTab() {
