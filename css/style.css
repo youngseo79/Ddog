@@ -290,7 +290,7 @@ ul { list-style: none; }
 #input-memo:focus { border-color: var(--accent); }
 #input-memo::placeholder { color: var(--text-muted); }
 #input-date, #input-remind { flex: 1 1 0; min-width: 0; background: var(--bg-surface); border: 1px solid var(--border-light); border-radius: var(--radius-sm); padding: 8px 12px; color: var(--text-primary); font-size: 13px; outline: none; transition: border-color 0.15s; }
-#input-remind { max-width: 70px; flex: none; }
+#input-remind { max-width: 46px; flex: none; padding-left: 6px; padding-right: 6px; }  /* 두 자리(최대 30)만 들어가도록 축소 */
 #input-date:focus, #input-remind:focus { border-color: var(--accent); }
 #input-date::-webkit-calendar-picker-indicator { filter: invert(0.7); }
 #modal-save { width: 100%; padding: 13px; background: var(--accent); color: #1a1a2e; border-radius: var(--radius-sm); font-size: 15px; font-weight: 600; transition: opacity 0.15s, transform 0.1s; margin-top: 4px; }
@@ -572,7 +572,7 @@ ul { list-style: none; }
 
 /* 반복 버튼 (상세 섹션 내) */
 .repeat-btn {
-  padding: 7px 18px;
+  padding: 7px 10px;
   border-radius: 20px;
   font-size: 13px;
   border: 1px solid var(--border-light);
