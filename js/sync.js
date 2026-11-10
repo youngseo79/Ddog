@@ -748,6 +748,13 @@ async function initSync() {
   });
 }
 
+// ── 서버 요청에 본인 로그인 토큰이 붙어 있는지 ──
+// 처음엔 공용 키(SUPABASE_KEY)가 붙어 있다가 로그인 확인 후 setAuthToken()으로 로그인 토큰으로 바뀜
+function _isLoginTokenAttached() {
+  const auth = (DB && DB.headers && DB.headers['Authorization']) || '';
+  return !!auth && auth !== `Bearer ${SUPABASE_KEY}`;
+}
+
 // ── 백그라운드 동기화 ──
 // updated_at 변경분 + 삭제된 항목 감지를 위해 Supabase 전체 id 목록과 비교
 // onQuickDone: 1단계(최근 변경분 받기) 완료 시 호출할 콜백 (앱 시작 시에만 사용, 생략 가능)
@@ -806,6 +813,10 @@ async function bgSync(onQuickDone) {
       });
     } catch(e) {}
 
+    // 목록을 받을 때 본인 로그인 토큰이 붙어 있었는지 기록
+    // (공용 키로 물으면 서버가 오류 대신 빈 목록을 주므로, 그때의 빈 목록은 믿지 않음)
+    const authedAtFetch = _isLoginTokenAttached();
+
     let sbList = [];
     let offset = 0;
     const pageSize = 1000;
@@ -818,7 +829,9 @@ async function bgSync(onQuickDone) {
       offset += pageSize;
     }
 
-    if (sbList.length > 0) {
+    // 서버 목록이 비어 있어도, 로그인 토큰으로 물어본 결과라면 진짜로 빈 것
+    // → 아래 대조를 그대로 진행해 기기에만 남은 행(다른 기기에서 전부 삭제된 행)을 지움
+    if (sbList.length > 0 || authedAtFetch) {
       const idbAll = await idbGetAll();
       if (gen !== _syncGen) return;
       const idbMap = new Map(idbAll.map(t => [String(t.id), t]));
