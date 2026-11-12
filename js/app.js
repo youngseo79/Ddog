@@ -61,6 +61,10 @@ async function bootApp() {
     console.warn('[app] 시간 일정 팝업 실패', e);
   }
 
+  // ── 공휴일: 불러와서 빨간 날 적용 + 올해 미등록이면 등록 모달 (holiday.js) ──
+  // (await 하지 않음 → 서버 응답을 기다리느라 스플래시가 늦게 걷히지 않도록)
+  if (typeof initHoliday === 'function') initHoliday().catch(e => console.warn('[app] 공휴일 초기화 실패', e));
+
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       document.getElementById('date-bar-actions').style.visibility = 'visible';
@@ -288,6 +292,7 @@ function hasOpenPopup() {
   if (document.getElementById('bucket-modal-overlay')) return true;
   if (document.getElementById('theme-sheet')) return true;
   if (document.getElementById('stats-overlay')) return true;
+  if (document.getElementById('holiday-overlay')) return true;
   // ── 창고 탭 전용 팝업들 (storage.js가 동적 생성) ──
   if (document.getElementById('storage-action-popup')) return true;
   if (document.getElementById('storage-date-picker-popup')) return true;
@@ -356,6 +361,13 @@ function closeTopPopup() {
   if (pcDatePicker) {
     pcDatePicker.remove();
     document.getElementById('pc-date-picker-backdrop')?.remove();
+    return;
+  }
+  // 공휴일 모달: 그 위에 뜬 디자인 달력(위 두 분기)이 먼저 닫힌 뒤에 닫힘
+  const holidayOverlay = document.getElementById('holiday-overlay');
+  if (holidayOverlay) {
+    if (typeof closeHolidayModal === 'function') closeHolidayModal();
+    else holidayOverlay.remove();
     return;
   }
   // ── 창고 액션 시트(모바일) / PC 드롭다운 ──

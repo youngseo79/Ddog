@@ -697,7 +697,9 @@ function _openStorageDatePicker(storageId, isPc, onSelect, initialDate) {
       const isToday    = dateStr === todayStr2;
       const isSelected = !!highlightDate && dateStr === highlightDate;
       const dow = new Date(pickerYear, pickerMonth - 1, d).getDay();
-      const color = dow === 0 ? 'var(--danger)' : dow === 6 ? 'var(--sat)' : 'var(--text-primary)';
+      // 공휴일(holiday.js에서 등록) → 빨간색 (토요일 파란색보다 우선)
+      const isHoliday = typeof isHolidayDate === 'function' && isHolidayDate(dateStr);
+      const color = (dow === 0 || isHoliday) ? 'var(--danger)' : dow === 6 ? 'var(--sat)' : 'var(--text-primary)';
       cell.style.cssText = `
         aspect-ratio:1;width:100%;border:none;cursor:pointer;border-radius:50%;
         font-size:15px;font-weight:${isToday||isSelected?'700':'400'};

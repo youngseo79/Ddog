@@ -209,6 +209,8 @@ function makeCalCell(day, year, month, isOtherMonth, today, selectedDate) {
   if (isOtherMonth) el.classList.add('other-month');
   if (dow === 0) el.classList.add('sun');
   if (dow === 6) el.classList.add('sat');
+  // 공휴일(holiday.js에서 등록) → 빨간색 (토요일 파란색보다 우선)
+  if (typeof isHolidayDate === 'function' && isHolidayDate(dateStr)) el.classList.add('holiday');
   // PC 달력 칸: 할일 점 아래에 음력 1일·15일만 표시 ('월.일', 윤달은 '윤월.일')
   if (document.body.classList.contains('pc-layout')) {
     const lunar = getLunarInfo(date.getFullYear(), date.getMonth() + 1, date.getDate());
@@ -262,7 +264,9 @@ function updateSelectedDateLabel() {
   const label = `${d.getMonth()+1}월 ${d.getDate()}일 (${days[dow]})`;
   const el = document.getElementById('selected-date-label');
   el.textContent = label;
-  el.className = dow === 0 ? 'date-label-sun' : dow === 6 ? 'date-label-sat' : 'date-label-weekday';
+  // 공휴일은 일요일과 같은 빨간색 (토요일이어도 빨간색)
+  const isHoliday = typeof isHolidayDate === 'function' && isHolidayDate(AppState.selectedDate);
+  el.className = (dow === 0 || isHoliday) ? 'date-label-sun' : dow === 6 ? 'date-label-sat' : 'date-label-weekday';
 
   // 선택 날짜의 음력 표시 (모바일: 양력 아래 줄 / PC: 양력과 날씨 사이)
   const lunarEl = document.getElementById('lunar-date-label');

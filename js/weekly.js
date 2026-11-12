@@ -114,8 +114,11 @@ function renderWeekDayCards(monday, hasTodo) {
     const dow = d.getDay();
     const card = document.createElement('div');
     card.className = 'week-day-card';
+    card.dataset.date = dateStr;
     if (dow === 6) card.classList.add('sat');
     if (dow === 0) card.classList.add('sun');
+    // 공휴일(holiday.js에서 등록) → 빨간색 (토요일 파란색보다 우선)
+    if (typeof isHolidayDate === 'function' && isHolidayDate(dateStr)) card.classList.add('holiday');
     if (dateStr === todayDateStr) card.classList.add('today');
     if (hasTodo[dateStr]) card.classList.add('has-todo');
     card.innerHTML = `<span class="wdc-name">${dayNames[dow]}</span><span class="wdc-num">${d.getDate()}</span>`;
