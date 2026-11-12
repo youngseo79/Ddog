@@ -509,6 +509,11 @@
       <span class="settings-menu-label">통계</span>
       <span class="settings-menu-arrow">›</span>
     </button>
+    <button class="settings-menu-item" id="menu-holiday">
+      <span class="settings-menu-icon">🎌</span>
+      <span class="settings-menu-label">공휴일</span>
+      <span class="settings-menu-arrow">›</span>
+    </button>
     <button class="settings-menu-item" id="menu-logout">
       <span class="settings-menu-icon">🚪</span>
       <span class="settings-menu-label">로그아웃</span>
@@ -579,17 +584,18 @@
 <script src="js/db.js"></script>
 <script src="js/sync.js?v=20261028a"></script>
 <script src="js/lunar.min.js"></script>
-<script src="js/calendar.js"></script>
+<script src="js/calendar.js?v=20261112a"></script>
 <script src="js/repeat.js"></script>
 <script src="js/modal.js"></script>
 <script src="js/gesture.js"></script>
 <script src="js/todo.js"></script>
 <script src="js/search.js?v=20261028a"></script>
-<script src="js/weekly.js"></script>
-<script src="js/storage.js"></script>
+<script src="js/weekly.js?v=20261112a"></script>
+<script src="js/storage.js?v=20261112b"></script>
 <script src="js/settings.js"></script>
 <script src="js/sound.js"></script>
-<script src="js/app.js?v=20261028a"></script>
+<script src="js/holiday.js?v=20261112c"></script>
+<script src="js/app.js?v=20261112b"></script>
 <script src="js/workmode.js?v=20261028a"></script>
 
 <!-- ===== PC 전용 스크립트 ===== -->
@@ -1220,7 +1226,9 @@ function pcPickDate(id, fromWeekly, targetDate, onSelect, opts) {
       const isToday    = dateStr === todayStr2;
       const isSelected = dateStr === highlightDate;
       const dow = new Date(pickerYear, pickerMonth - 1, d).getDay();
-      const color = dow === 0 ? 'var(--danger)' : dow === 6 ? 'var(--sat)' : 'var(--text-primary)';
+      // 공휴일(holiday.js에서 등록) → 빨간색 (토요일 파란색보다 우선)
+      const isHoliday = typeof isHolidayDate === 'function' && isHolidayDate(dateStr);
+      const color = (dow === 0 || isHoliday) ? 'var(--danger)' : dow === 6 ? 'var(--sat)' : 'var(--text-primary)';
       cell.style.cssText = `
         aspect-ratio:1;width:100%;border:none;cursor:pointer;border-radius:50%;
         font-size:16px;font-weight:${isToday||isSelected?'700':'400'};
