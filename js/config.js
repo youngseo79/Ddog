@@ -38,10 +38,24 @@ function getCurrentUserId() {
 }
 
 // Supabase JS SDK 클라이언트 (Realtime용)
+// ※ 출입증(토큰) 관리는 이 파일의 코드만 담당한다.
+//   SDK는 실시간 연결에 쓸 토큰을 여기서 받아가기만 하고, 스스로 갱신·저장하지 않는다.
+//   (예전에는 SDK도 따로 갱신해서, 이미 쓴 리프레시 토큰을 두 번 쓰게 되면
+//    Supabase가 세션 전체를 끊어 로그아웃되는 문제가 있었음)
 let supabaseClient = null;
 function getSupabaseClient() {
   if (!supabaseClient) {
-    supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    // 예전 SDK가 따로 저장해 두던 출입증 사본 정리 (이제 쓰지 않음)
+    try {
+      const ref = new URL(SUPABASE_URL).hostname.split('.')[0];
+      localStorage.removeItem(`sb-${ref}-auth-token`);
+    } catch(e) {}
+    supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+      accessToken: async () => {
+        const s = loadSession();
+        return (s && s.access_token) ? s.access_token : null;
+      }
+    });
   }
   return supabaseClient;
 }
@@ -94,69 +108,158 @@ function isTokenExpired(session) {
   return Date.now() / 1000 > session.expires_at - 300; // 만료 5분 전 갱신
 }
 
+// 갱신 실패 시 error.invalid 로 원인을 구분
+//   invalid = true  → 서버가 "이 출입증은 무효"라고 답함 (진짜 로그아웃 대상)
+//   invalid = false → 인터넷 끊김·서버 일시 오류 (출입증은 그대로 두고 나중에 재시도)
 async function refreshSession(session) {
-  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
-    method: 'POST',
-    headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refresh_token: session.refresh_token })
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error('세션 갱신 실패');
+  if (!session || !session.refresh_token) {
+    const err = new Error('리프레시 토큰 없음'); err.invalid = true; throw err;
+  }
+  let res;
+  try {
+    res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: session.refresh_token })
+    });
+  } catch(e) {
+    const err = new Error('네트워크 오류로 세션 갱신 실패'); err.invalid = false; throw err;
+  }
+  let data = null;
+  try { data = await res.json(); } catch(e) {}
+  if (!res.ok) {
+    const err = new Error(`세션 갱신 실패 (${res.status})`);
+    err.invalid = (res.status === 400 || res.status === 401 || res.status === 403);
+    throw err;
+  }
+  if (!data || !data.access_token) {
+    const err = new Error('세션 갱신 응답 이상'); err.invalid = false; throw err;
+  }
   return data;
+}
+
+// ── 출입증 갱신 단일 창구 ──
+// 여러 곳(타이머·화면 복귀·인터넷 연결)에서 동시에 불려도 실제 갱신 요청은 한 번만 나감
+// 결과: 'none' | 'valid' | 'refreshed' | 'invalid' | 'offline'
+let _refreshPromise = null;
+let _authStale = false;   // 만료된 출입증으로 버티는 중 (인터넷 끊김 등) → 갱신되면 동기화 다시
+let _appReady  = false;   // bootApp 완료 여부 (완료 전에는 동기화 재시작을 하지 않음)
+
+function refreshNow() {
+  if (_refreshPromise) return _refreshPromise;
+  _refreshPromise = (async () => {
+    // 매번 저장소에서 다시 읽음 (다른 창에서 이미 갱신했을 수 있음)
+    const session = loadSession();
+    if (!session || !session.access_token) return 'none';
+    if (!isTokenExpired(session)) {
+      setAuthToken(session.access_token);
+      return 'valid';
+    }
+    try {
+      const newSession = await refreshSession(session);
+      saveSession(newSession);
+      setAuthToken(newSession.access_token);
+      return 'refreshed';
+    } catch(e) {
+      console.warn('[auth] 토큰 갱신 실패:', e);
+      if (e.invalid) {
+        // 요청하는 사이 다른 창이 먼저 갱신했다면 그 새 출입증을 사용
+        const cur = loadSession();
+        if (cur && cur.access_token && cur.refresh_token !== session.refresh_token) {
+          setAuthToken(cur.access_token);
+          return 'refreshed';
+        }
+        return 'invalid';
+      }
+      return 'offline';
+    }
+  })().finally(() => { _refreshPromise = null; });
+  return _refreshPromise;
+}
+
+// 출입증이 새로 바뀐 뒤 처리
+function _onTokenRefreshed() {
+  if (!_appReady) return;   // 앱 준비 전이면 showApp 완료 시 다시 확인
+  // Realtime 채널도 새 토큰으로 재연결 (기존 동작)
+  if (typeof startRealtime === 'function') startRealtime();
+  // 만료된 출입증으로 버티던 중이었다면, 그동안 못 한 동기화를 다시 진행
+  if (_authStale) {
+    _authStale = false;
+    if (typeof flushQueue === 'function') flushQueue().catch(e => console.warn('[auth] flush 실패', e));
+    if (typeof bgSync === 'function') {
+      bgSync().catch(e => {
+        console.warn('[sync] bg sync 실패', e);
+        if (typeof refreshCurrentTab === 'function') refreshCurrentTab();
+        if (typeof updateMonthDots === 'function') updateMonthDots();
+      });
+    }
+  }
+}
+
+// 갱신 시도 + 결과 처리 (백그라운드용)
+let _refreshRetryTimer = null;
+async function _checkAndRefresh() {
+  const r = await refreshNow();
+  if (r === 'refreshed' || (r === 'valid' && _authStale)) {
+    _onTokenRefreshed();
+  } else if (r === 'offline') {
+    _authStale = true;
+    // 인터넷이 약한 경우 대비: 30초 후 다시 시도 (연결되면 성공할 때까지 반복)
+    if (!_refreshRetryTimer) {
+      _refreshRetryTimer = setTimeout(() => {
+        _refreshRetryTimer = null;
+        _checkAndRefresh();
+      }, 30 * 1000);
+    }
+  }
+  // 'invalid'는 기존과 동일하게 실행 중에는 로그아웃시키지 않음 (다음 앱 시작 시 처리)
 }
 
 // ── 백그라운드 JWT 자동 갱신 ──
 let _tokenRefreshTimer = null;
+let _refreshListenersAdded = false;
 
 function startTokenRefresh() {
   if (_tokenRefreshTimer) clearInterval(_tokenRefreshTimer);
   // 10분마다 체크 (JWT 7일, 만료 5분 전에 갱신)
-  _tokenRefreshTimer = setInterval(async () => {
-    const session = loadSession();
-    if (!session || !session.access_token) return;
-    if (isTokenExpired(session)) {
-      try {
-        const newSession = await refreshSession(session);
-        saveSession(newSession);
-        setAuthToken(newSession.access_token);
-        await getSupabaseClient().auth.setSession({
-          access_token: newSession.access_token,
-          refresh_token: newSession.refresh_token
-        });
-        // 토큰 갱신 후 Realtime 채널도 새 토큰으로 재연결
-        if (typeof startRealtime === 'function') startRealtime();
-      } catch(e) {
-        console.warn('[auth] 토큰 갱신 실패:', e);
-      }
-    }
-  }, 10 * 60 * 1000); // 10분마다
+  _tokenRefreshTimer = setInterval(_checkAndRefresh, 10 * 60 * 1000); // 10분마다
+
+  // 화면 복귀·인터넷 연결 시에도 바로 확인
+  // (모바일은 백그라운드에서 타이머가 멈추므로, 복귀 직후 만료된 출입증을 바로 교체)
+  if (!_refreshListenersAdded) {
+    _refreshListenersAdded = true;
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') _checkAndRefresh();
+    });
+    window.addEventListener('online', () => _checkAndRefresh());
+  }
 }
 
 // ── 앱 시작 시 인증 확인 ──
 // 로컬 세션이 유효하면 즉시 true 반환 (스플래시만 잠깐 보임)
 // 만료된 경우만 Supabase에 refresh 요청
+//  - 서버가 무효라고 답한 경우에만 로그아웃
+//  - 인터넷 끊김·서버 일시 오류면 기기에 저장된 일정으로 앱을 열고, 연결되면 자동 재시도
 async function initAuth() {
-  let session = loadSession();
+  const session = loadSession();
   if (!session || !session.access_token) return false;
 
   if (isTokenExpired(session)) {
-    try {
-      session = await refreshSession(session);
-      saveSession(session);
-    } catch(e) {
+    const r = await refreshNow();
+    if (r === 'invalid' || r === 'none') {
       clearSession();
       return false;
     }
+    if (r === 'offline') {
+      setAuthToken(session.access_token);
+      _authStale = true;
+    }
+  } else {
+    setAuthToken(session.access_token);
   }
 
-  setAuthToken(session.access_token);
-  try {
-    await getSupabaseClient().auth.setSession({
-      access_token: session.access_token,
-      refresh_token: session.refresh_token
-    });
-  } catch(e) {}
   startTokenRefresh();
+  if (_authStale) _checkAndRefresh();   // 30초 간격 재시도 시작
   return true;
 }
 
@@ -202,10 +305,7 @@ function initLoginForm() {
       clearLoginFails();
       saveSession(session);
       setAuthToken(session.access_token);
-      await getSupabaseClient().auth.setSession({
-        access_token: session.access_token,
-        refresh_token: session.refresh_token
-      });
+      _authStale = false;
       startTokenRefresh();
       await showApp();
     } catch(err) {
@@ -250,6 +350,10 @@ async function showApp() {
 
   // bootApp 실행
   await bootApp();
+
+  // 앱 준비 완료 → 그 사이 출입증이 갱신됐거나 갱신이 필요하면 처리
+  _appReady = true;
+  if (_authStale) _checkAndRefresh();
 
   // 스플래시/로그인 페이드아웃, 앱 페이드인
   if (splash) { splash.style.transition = 'opacity 0.3s'; splash.style.opacity = '0'; }
