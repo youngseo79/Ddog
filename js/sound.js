@@ -111,7 +111,7 @@ function _unlockAudio() {
   } catch (e) {}
 
   _loadBuffer().then(() => {
-    if (_pendingPlay) { _pendingPlay = false; playCompleteSound(); }
+    if (_pendingPlay) { _pendingPlay = false; _playSfx(); }
   }).catch(() => {});
 
   if (ctx.state === 'running') _removeUnlock();
@@ -131,8 +131,24 @@ _loadBuffer().catch(() => {});
 
 // =============================================
 // 공개 API — 기존 호출부 그대로 사용 가능
+// 할일 완료 시: 효과음(즉시) + 폭죽(화면 갱신이 먼저 그려진 다음)
 // =============================================
 function playCompleteSound() {
+  _playSfx();
+  _scheduleFireworks();
+}
+
+// 폭죽은 지금 하던 일(체크 표시·목록 다시 그리기)과 그 화면 그리기가 끝난 다음에 시작
+// → 체크는 지연 없이 바로 바뀌고, 폭죽은 한 박자(1프레임) 뒤에 따라옴
+function _scheduleFireworks() {
+  try {
+    const go = () => setTimeout(() => { try { Fireworks.play('small', 4000); } catch (e) {} }, 0);
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(go); else go();
+  } catch (e) { /* 연출 실패는 무시 */ }
+}
+
+// ── 효과음 재생 (기존 playCompleteSound 내용 그대로) ──
+function _playSfx() {
   const ctx = _getCtx();
 
   // Web Audio 자체가 불가능한 환경 → 구형 방식으로 폴백
@@ -144,7 +160,7 @@ function playCompleteSound() {
     // 아직 디코딩 전이면, 끝나는 대로 한 번 재생
     _pendingPlay = true;
     _loadBuffer().then(() => {
-      if (_pendingPlay) { _pendingPlay = false; playCompleteSound(); }
+      if (_pendingPlay) { _pendingPlay = false; _playSfx(); }
     }).catch(() => { _pendingPlay = false; _fallbackPlay(); });
     return;
   }
@@ -176,3 +192,145 @@ function _fallbackPlay() {
     _fallbackEl.play().catch(() => {});
   } catch (e) {}
 }
+
+// =============================================
+// 폭죽 엔진 (학원 앱과 같은 모양 · 모바일 지연 줄인 버전)
+// - 화면 맨 위 투명 캔버스에만 그림 (pointer-events:none) → 터치·클릭·스크롤·다른 기능에 영향 없음
+// - 캔버스는 처음 한 번만 만들고 다시 씀 (완료할 때마다 새로 만들지 않음), 쉴 때는 숨김
+// - 해상도: 모바일 1배 · PC 최대 1.5배 (색종이는 고해상도가 필요 없음 → 그리는 양 크게 줄임)
+// - 화면 크기에 맞춰 양·범위 자동 조절 (PC는 넓고 크게, 모바일은 모바일대로)
+// - 오류가 나도 무시 → 완료 처리·저장·동기화·효과음은 절대 멈추지 않음
+// =============================================
+const Fireworks = {
+  COLORS: ['#F0A202', '#F7B733', '#FFFDF6', '#E8730A', '#FF9F6B'],
+  cv: null, ctx: null, parts: [], queue: [], until: 0, fade: 600, raf: 0, last: 0, t0: 0, t: 0, w: 0, h: 0, dpr: 1,
+
+  reduced() { return !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches); },
+  canvas() {
+    if (!this.cv) {
+      const cv = this.cv = document.createElement('canvas');
+      cv.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:9999;display:none';
+      cv.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(cv);
+      this.ctx = cv.getContext('2d');
+      this.w = 0; this.h = 0;
+    }
+    const w = window.innerWidth, h = window.innerHeight;
+    const dpr = w < 600 ? 1 : Math.min(window.devicePixelRatio || 1, 1.5);
+    if (w !== this.w || h !== this.h || dpr !== this.dpr) {          // 크기가 바뀐 경우에만 다시 맞춤
+      this.w = w; this.h = h; this.dpr = dpr;
+      this.cv.width = Math.round(w * dpr); this.cv.height = Math.round(h * dpr);
+    }
+    this.cv.style.display = 'block';
+  },
+  rnd(a, b) { return a + Math.random() * (b - a); },
+
+  // 양옆 아래에서 안쪽 위로 쏘는 축포 (화면 가운데까지 닿게)
+  cannon(n, cols) {
+    const { w, h } = this, up = Math.max(0.75, Math.min(1.3, h / 850));
+    for (let i = 0; i < n; i++) {
+      const L = i % 2 === 0;
+      this.parts.push({ t: 'c', x: L ? -10 : w + 10, y: h * this.rnd(0.72, 0.95), vx: (L ? 1 : -1) * this.rnd(5, 15) * Math.max(0.8, w / 1400),
+        vy: -this.rnd(13, 25) * up, g: 0.34, d: 0.99, s: this.rnd(6, 12), r: Math.random() * 6.3, vr: this.rnd(-0.35, 0.35), c: cols[i % cols.length] });
+    }
+  },
+  // 화면 가운데 · 위쪽에서 둥글게 퍼지는 불꽃 (불티 + 색종이)
+  burst(n, cols) {
+    const { w, h } = this;
+    const cx = w * this.rnd(0.22, 0.78), cy = h * this.rnd(0.18, 0.5), sp = Math.max(0.8, Math.min(1.4, Math.min(w, h) / 750));
+    const c0 = cols[Math.floor(Math.random() * cols.length)];
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, v = this.rnd(2.5, 10) * sp;
+      this.parts.push({ t: 's', x: cx, y: cy, vx: Math.cos(a) * v, vy: Math.sin(a) * v, g: 0.07, d: 0.955, s: this.rnd(2, 3.8),
+        life: this.rnd(900, 1700), age: 0, c: i % 3 ? c0 : cols[i % cols.length] });
+    }
+    for (let i = 0; i < Math.round(n / 4); i++) {
+      const a = Math.random() * Math.PI * 2, v = this.rnd(3, 9) * sp;
+      this.parts.push({ t: 'c', x: cx, y: cy, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 2, g: 0.18, d: 0.97, s: this.rnd(6, 11),
+        r: Math.random() * 6.3, vr: this.rnd(-0.35, 0.35), c: cols[i % cols.length] });
+    }
+  },
+  // 위에서 화면 전체로 천천히 내려오는 색종이
+  rain(n, cols) {
+    for (let i = 0; i < n; i++) {
+      this.parts.push({ t: 'r', x: Math.random() * this.w, y: -this.rnd(10, 60), vx: 0, vy: this.rnd(1.6, 3.6), ph: Math.random() * 6.3,
+        s: this.rnd(6, 11), r: Math.random() * 6.3, vr: this.rnd(-0.12, 0.12), c: cols[i % cols.length] });
+    }
+  },
+  // 시간표대로 조각 넣기 — 한꺼번에 만들지 않고 프레임마다 나눠 넣음
+  plan(kind, cols) {
+    const k = this.w < 600 ? 0.6 : 1, N = (x) => Math.max(1, Math.round(x * k)), at = (ms, fn) => this.queue.push({ at: this.t + ms, fn });
+    if (kind === 'big') {
+      at(0, () => this.cannon(N(240), cols));
+      at(300, () => this.cannon(N(200), cols));
+      [200, 800, 1400, 2000, 2700, 3400].forEach(ms => at(ms, () => this.burst(N(110), cols)));
+      for (let ms = 1500; ms <= 4500; ms += 300) at(ms, () => this.rain(N(30), cols));
+    } else {
+      at(0, () => this.cannon(N(140), cols));
+      [100, 550, 1050].forEach(ms => at(ms, () => this.burst(N(70), cols)));
+      for (let ms = 900; ms <= 2100; ms += 300) at(ms, () => this.rain(N(16), cols));
+    }
+  },
+
+  play(kind, ms, colors) {
+    try {
+      if (this.reduced()) return;
+      const now = performance.now();
+      if (!this.raf) { this.canvas(); this.t0 = now; this.t = 0; this.last = now; this.parts = []; this.queue = []; }
+      this.plan(kind, colors && colors.length ? colors : this.COLORS);
+      this.until = Math.max(this.until, now + ms);
+      this.fade = kind === 'big' ? 900 : 600;
+      if (!this.raf) this.raf = requestAnimationFrame(() => this.step());
+    } catch (e) { /* 연출 실패는 무시 */ }
+  },
+  stop() {
+    try {
+      cancelAnimationFrame(this.raf);
+      this.raf = 0; this.until = 0; this.parts = []; this.queue = [];
+      if (this.ctx) { this.ctx.setTransform(1, 0, 0, 1, 0, 0); this.ctx.clearRect(0, 0, this.cv.width, this.cv.height); }
+      if (this.cv) this.cv.style.display = 'none';
+    } catch (e) {}
+  },
+  step() {
+    try {
+      const now = performance.now();
+      const left = this.until - now;
+      if (left <= 0 || !this.cv) { this.stop(); return; }
+      const dt = Math.min(3, (now - this.last) / 16.67);        // 화면 주사율과 상관없이 같은 속도
+      this.last = now; this.t = now - this.t0;
+      if (this.queue.length) {
+        const due = this.queue.filter(q => q.at <= this.t);
+        if (due.length) { this.queue = this.queue.filter(q => q.at > this.t); due.forEach(q => q.fn()); }
+      }
+      const { ctx, w, h, dpr } = this;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+      const base = Math.min(1, left / this.fade);              // 끝날 때 서서히 흐려짐
+      const keep = [];
+      for (const q of this.parts) {
+        if (q.t === 'r') { q.x += Math.sin(this.t / 400 + q.ph) * 0.9 * dt; q.y += q.vy * dt; }
+        else { q.vy += q.g * dt; const dd = Math.pow(q.d, dt); q.vx *= dd; q.vy *= dd; q.x += q.vx * dt; q.y += q.vy * dt; }
+        if (q.y > h + 40 || q.x < -60 || q.x > w + 60) continue;
+        if (q.t === 's') {
+          q.age += 16.67 * dt;
+          if (q.age >= q.life) continue;
+          ctx.globalAlpha = base * (1 - q.age / q.life);
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          ctx.fillStyle = q.c;
+          ctx.fillRect(q.x - q.s, q.y - q.s, q.s * 2, q.s * 2);   // 불티: 원 대신 작은 사각형 (모바일에서 훨씬 가벼움, 눈으로는 거의 같음)
+        } else {
+          q.r += q.vr * dt;
+          ctx.globalAlpha = base;
+          const c = Math.cos(q.r), s = Math.sin(q.r);
+          ctx.setTransform(c * dpr, s * dpr, -s * dpr, c * dpr, q.x * dpr, q.y * dpr);
+          ctx.fillStyle = q.c;
+          ctx.fillRect(-q.s / 2, -q.s / 4, q.s, q.s / 2);
+        }
+        keep.push(q);
+      }
+      this.parts = keep;
+      ctx.globalAlpha = 1;
+      this.raf = requestAnimationFrame(() => this.step());
+    } catch (e) { this.stop(); }
+  },
+};

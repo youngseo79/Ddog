@@ -549,6 +549,26 @@ window.addEventListener('beforeunload', async () => {
 
 let realtimeChannel = null;
 let realtimeRestartTimer = null;
+let _realtimeSeq = 0;   // startRealtime 호출 순번 — 출입증을 기다리는 사이 더 새 호출이 오면 이전 호출은 채널을 만들지 않음
+
+// 실시간 연결에 지금 로그인 출입증을 먼저 넘긴다 (채널을 만들기 전에)
+// [원인] SDK가 출입증을 비동기로 늦게 받아 오면, 채널이 출입증 없이(공용 키로) 먼저 접속해
+//        '연결됨(joined)'인데도 서버가 권한 없음으로 보고 알림을 하나도 보내지 않았음
+// 출입증 관리는 지금처럼 config.js만 담당 (여기서는 저장된 출입증을 읽어서 넘겨주기만 함)
+// 넘기기가 늦어져도 최대 3초만 기다리고 진행 → 연결이 멈추지 않음
+async function _realtimeAuth(client) {
+  try {
+    const s = (typeof loadSession === 'function') ? loadSession() : null;
+    const token = s && s.access_token;
+    if (!token || !client.realtime || typeof client.realtime.setAuth !== 'function') return;
+    await Promise.race([
+      Promise.resolve(client.realtime.setAuth(token)),
+      new Promise(r => setTimeout(r, 3000))
+    ]);
+  } catch(e) {
+    console.warn('[realtime] 출입증 전달 실패 (무시)', e);
+  }
+}
 
 async function startRealtime() {
   // 이미 진행 중인 재시작 타이머가 있으면 취소하고 새로 시작
@@ -557,6 +577,7 @@ async function startRealtime() {
     clearTimeout(realtimeRestartTimer);
     realtimeRestartTimer = null;
   }
+  const seq = ++_realtimeSeq;
 
   const client = getSupabaseClient();
 
@@ -569,6 +590,10 @@ async function startRealtime() {
       console.warn('[realtime] removeChannel 실패 (무시)', e)
     );
   }
+
+  // 채널을 만들기 전에 로그인 출입증부터 넘김
+  await _realtimeAuth(client);
+  if (seq !== _realtimeSeq) return;   // 기다리는 사이 더 새 startRealtime이 시작됨 → 그쪽이 채널을 만듦
 
   // 채널 이름에 타임스탬프를 붙여 매번 고유하게 생성
   const channelName = `ddog-changes-${Date.now()}`;
