@@ -530,21 +530,6 @@ async function onOnline() {
   await flushQueue();
 }
 
-// 브라우저 닫힐 때
-window.addEventListener('beforeunload', async () => {
-  const ops = await queueGetAll().catch(() => []);
-  ops.forEach(op => {
-    try {
-      const url  = `${DB.url}/rest/v1/${op.path}`;
-      const blob = new Blob(
-        [op.body ? JSON.stringify(op.body) : ''],
-        { type: 'application/json' }
-      );
-      navigator.sendBeacon(url, blob);
-    } catch(e) {}
-  });
-});
-
 // ── Realtime 구독 ──
 
 let realtimeChannel = null;
