@@ -129,3 +129,60 @@
   .wx, .wx * , .wx-art::after { animation: none !important; }
   .wx-drop, .wx-flake { opacity: .9; transform: translateY(10px) rotate(14deg); }
 }
+
+/* ---------- 칩 끝 톱니바퀴 (지역 설정) ---------- */
+.wx-gear {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 24px; height: 24px; margin-left: -2px; padding: 0; border: 0; border-radius: 6px;
+  background: transparent; color: var(--text-muted); cursor: pointer;
+  transition: color .15s, background .15s;
+}
+.wx-gear svg { width: 15px; height: 15px; fill: currentColor; transition: transform .35s ease; }
+.wx-gear:hover { color: var(--accent); background: var(--bg-hover); }
+.wx-gear:hover svg { transform: rotate(60deg); }
+.wx-gear:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* ---------- 지역 설정 모달 ---------- */
+#wxpc-loc-overlay {
+  position: fixed; inset: 0; z-index: 9000; display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, .45); animation: wxl-fade .15s ease-out both;
+  font-family: var(--font-main);
+}
+@keyframes wxl-fade { from { opacity: 0; } to { opacity: 1; } }
+.wxl-box {
+  width: 400px; max-width: calc(100vw - 32px); max-height: calc(100vh - 64px); display: flex; flex-direction: column;
+  padding: 18px 18px 14px; border: 1px solid var(--border-light); border-radius: var(--radius, 12px);
+  background: var(--bg-elevated); color: var(--text-primary); box-shadow: 0 12px 40px rgba(0, 0, 0, .3);
+  animation: wxl-pop .18s ease-out both;
+}
+@keyframes wxl-pop { from { opacity: 0; transform: translateY(6px) scale(.98); } to { opacity: 1; transform: none; } }
+.wxl-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.wxl-head b { font-size: 16px; font-weight: 700; }
+.wxl-x { width: 28px; height: 28px; border: 0; border-radius: 6px; background: transparent; color: var(--text-secondary); font-size: 15px; cursor: pointer; }
+.wxl-x:hover { background: var(--bg-hover); color: var(--text-primary); }
+.wxl-cur { font-size: 13px; color: var(--text-secondary); margin-bottom: 12px; }
+.wxl-cur b { color: var(--accent); font-weight: 700; margin-left: 4px; }
+.wxl-sec { font-size: 12.5px; font-weight: 700; color: var(--text-secondary); margin: 4px 0 8px; }
+.wxl-sec span { font-weight: 400; color: var(--text-muted); margin-left: 6px; }
+.wxl-presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.wxl-chip {
+  padding: 5px 10px; border: 1px solid var(--border-light); border-radius: 999px;
+  background: var(--bg-surface); color: var(--text-primary); font-size: 13px; font-family: inherit; cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+.wxl-chip:hover { border-color: var(--accent); color: var(--accent); }
+.wxl-chip.on { border-color: var(--accent); background: var(--accent-glow, transparent); color: var(--accent); font-weight: 700; }
+.wxl-input {
+  width: 100%; box-sizing: border-box; padding: 9px 12px; border: 1px solid var(--border-light); border-radius: var(--radius-sm, 8px);
+  background: var(--bg-surface); color: var(--text-primary); font-size: 14px; font-family: inherit; outline: none;
+}
+.wxl-input:focus { border-color: var(--accent); }
+.wxl-list { margin-top: 8px; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.wxl-item {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; padding: 7px 10px;
+  border: 0; border-radius: 6px; background: transparent; color: var(--text-primary); font-family: inherit; text-align: left; cursor: pointer;
+}
+.wxl-item:hover, .wxl-item:focus-visible { background: var(--bg-hover); outline: none; }
+.wxl-item b { font-size: 14px; font-weight: 700; }
+.wxl-item span { font-size: 12px; color: var(--text-muted); }
+.wxl-msg { padding: 10px 4px; font-size: 13px; color: var(--text-muted); }
