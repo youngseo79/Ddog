@@ -416,7 +416,15 @@ function switchTab(tabName) {
   if (tabName === 'todo')        { rendered = Promise.all([loadTodos(), updateMonthDots()]); }
   else if (tabName === 'weekly') { weekOffset = 0; rendered = loadWeekly(); }
   else if (tabName === 'storage'){ rendered = loadStorage(); }
-  else if (tabName === 'search') { setTimeout(() => document.getElementById('search-input').focus(), 200); }
+  else if (tabName === 'search') {
+    // 검색어가 남아 있으면 다시 검색해서 최신 상태(삭제·수정·완료 등)를 반영
+    const kw = document.getElementById('search-input').value.trim();
+    if (kw && typeof runSearch === 'function') {
+      if (typeof searchTimer !== 'undefined') clearTimeout(searchTimer);
+      runSearch(kw);
+    }
+    setTimeout(() => document.getElementById('search-input').focus(), 200);
+  }
   return rendered;
 }
 
